@@ -1,6 +1,8 @@
 use bevy::{input::mouse::MouseMotion, prelude::*, window::CursorGrabMode};
 
-use crate::{spawn_ball, spawn_bricks, Ball, Brick, Paddle, PADDLE_WIDTH, WIN_WIDTH};
+use crate::{
+    reset_bricks, spawn_ball, spawn_bricks, Brick, GameAssets, Paddle, PADDLE_WIDTH, WIN_WIDTH,
+};
 
 pub struct GameInputPlugin;
 
@@ -15,23 +17,13 @@ impl Plugin for GameInputPlugin {
 fn keyboard_input(
     kb: Res<Input<KeyCode>>,
     mut commands: Commands,
-    bricks: Query<Entity, With<Brick>>,
-    mut ball_query: Query<(Entity, &mut Transform, &mut Ball)>,
-    asset_server: Res<AssetServer>,
+    query: Query<Entity, With<Brick>>,
+    assets: Res<GameAssets>,
 ) {
     if kb.just_pressed(KeyCode::R) {
-        for brick_entity in bricks.iter() {
-            commands.entity(brick_entity).despawn();
-        }
-        spawn_bricks(commands, asset_server);
-
-        let (entity, mut transform, mut ball) = ball_query.single_mut();
-        transform.translation = Vec3::new(0., 50., 0.);
-        ball.curve = 0.;
-        ball.direction = Vec2::NEG_Y;
-
-        // commands.entity(entity).despawn();
-        // spawn_ball(commands, asset_server);
+        reset_bricks(&mut commands, &query);
+        spawn_bricks(&mut commands, &assets);
+        spawn_ball(&mut commands, &assets);
     }
 }
 
