@@ -48,6 +48,7 @@ fn main() {
                 width: WIN_WIDTH,
                 height: WIN_HEIGHT,
                 resizable: false,
+                monitor: MonitorSelection::Index(0),
                 ..default()
             },
             ..default()
@@ -56,14 +57,14 @@ fn main() {
         .add_plugin(BallPlugin)
         .add_plugin(GameInputPlugin)
         .add_plugin(GameAssetsPlugin)
-        .add_state(GameState::PreGame)
+        .add_state(GameState::InGame)
         .add_system_set(
             SystemSet::on_enter(GameState::InGame)
                 .with_system(reset_score)
                 .with_system(spawn_ball_count)
                 .with_system(spawn_bricks)
                 .with_system(spawn_paddle)
-                // .with_system(spawn_score_text)
+                .with_system(spawn_score_text)
                 .with_system(spawn_ball),
         )
         .add_system_set(
