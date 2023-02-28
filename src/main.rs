@@ -1,47 +1,42 @@
 use assets::*;
-use ball::{spawn_ball, BallPlugin};
-use bevy::{ecs::system::Command, prelude::*, sprite::collide_aabb::*};
-use input::GameInputPlugin;
+use ball::*;
+use bevy::{prelude::*, sprite::collide_aabb::*};
+use components::*;
+use input::*;
 
 const WIN_WIDTH: f32 = 800.;
 const WIN_HEIGHT: f32 = 800.;
 const PADDLE_WIDTH: f32 = 104.;
 const PADDLE_HEIGHT: f32 = 24.;
-const BALL_SIZE: f32 = 22.;
 const BRICK_WIDTH: f32 = 64.;
 const BRICK_HEIGHT: f32 = 32.;
 
 mod assets;
 mod ball;
+mod components;
 mod input;
 
-#[derive(Component)]
-pub struct Brick;
-
-#[derive(Component, Default)]
-pub struct Ball {
-    pub direction: Vec2,
-    pub speed: f32,
-    pub curve: f32,
+#[derive(Resource)]
+pub struct PlayerProgress {
+    score: f32,
+    ball_count: u16,
 }
 
-#[derive(Component)]
-pub struct Paddle {
-    speed: f32,
+impl Default for PlayerProgress {
+    fn default() -> Self {
+        PlayerProgress {
+            score: 0.,
+            ball_count: 3,
+        }
+    }
 }
 
-#[derive(Component)]
-pub struct Collider {
-    size: Vec2,
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+enum GameState {
+    PreGame,
+    InGame,
+    Change,
 }
-
-pub enum BallCollisionType {
-    Wall,
-    Paddle,
-    Brick,
-}
-
-pub struct BallCollisionEvent(BallCollisionType);
 
 fn main() {
     App::new()
@@ -55,43 +50,113 @@ fn main() {
             },
             ..default()
         }))
-        .add_startup_system(init)
+        .insert_resource(ClearColor(Color::rgb(0.218, 0.554, 0.777)))
         .add_plugin(BallPlugin)
         .add_plugin(GameInputPlugin)
         .add_plugin(GameAssetsPlugin)
+        .add_state(GameState::PreGame)
+        .add_system_set(
+            SystemSet::on_enter(GameState::InGame)
+                .with_system(reset_score)
+                .with_system(spawn_bricks)
+                .with_system(spawn_paddle)
+                .with_system(spawn_score_text)
+                .with_system(spawn_ball),
+        )
+        .add_system_set(
+            SystemSet::on_update(GameState::InGame)
+                .with_system(increase_ball_speed)
+                .with_system(on_ball_loss)
+                .with_system(text_update_system),
+        )
+        .add_system_set(
+            SystemSet::on_exit(GameState::InGame)
+                .with_system(despawn_balls)
+                .with_system(despawn_paddle)
+                .with_system(despawn_text)
+                .with_system(despawn_bricks),
+        )
+        .insert_resource(PlayerProgress::default())
         .add_startup_system(spawn_camera)
-        .add_startup_system(spawn_paddle)
-        .add_system_to_stage(CoreStage::Last, collision_sounds)
-        .add_event::<BallCollisionEvent>()
-        .insert_resource(ClearColor(Color::rgb(0.218, 0.554, 0.777)))
+        .add_system_to_stage(CoreStage::Last, on_ball_collision)
         .run();
 }
 
-fn init(
-    mut commands: Commands,
-    bricks: Query<Entity, With<Brick>>,
-    assets: Res<GameAssets>,
-    balls: Query<Entity, With<Ball>>,
+fn despawn_text(mut commands: Commands, query: Query<(Entity, &Text)>) {
+    for (entity, _) in query.iter() {
+        commands.entity(entity).despawn();
+    }
+}
+
+fn despawn_paddle(mut commands: Commands, query: Query<(Entity, &Paddle)>) {
+    for (entity, _) in query.iter() {
+        commands.entity(entity).despawn();
+    }
+}
+
+fn increase_ball_speed(mut query: Query<&mut Ball>, time: Res<Time>) {
+    for mut ball in query.iter_mut() {
+        ball.speed += time.delta_seconds() * 4.;
+    }
+}
+
+fn reset_score(mut player_progress: ResMut<PlayerProgress>) {
+    *player_progress = PlayerProgress::default();
+}
+
+fn spawn_score_text(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.spawn((
+        // Create a TextBundle that has a Text with a list of sections.
+        TextBundle::from_sections([
+            TextSection::new(
+                "Score: ",
+                TextStyle {
+                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                    font_size: 60.0,
+                    color: Color::WHITE,
+                },
+            ),
+            TextSection::from_style(TextStyle {
+                font: asset_server.load("fonts/FiraMono-Medium.ttf"),
+                font_size: 60.0,
+                color: Color::GOLD,
+            }),
+        ])
+        .with_style(Style {
+            margin: UiRect {
+                left: Val::Px(10.),
+                top: Val::Px(10.),
+                ..default()
+            },
+            ..default()
+        }),
+        ScoreText,
+    ));
+}
+
+fn text_update_system(
+    mut query: Query<&mut Text, With<ScoreText>>,
+    player_progress: Res<PlayerProgress>,
 ) {
-    reset_bricks(&mut commands, &bricks);
-    spawn_bricks(&mut commands, &assets);
-    clear_balls(&mut commands, &balls);
-    spawn_ball(&mut commands, &assets);
+    for mut text in &mut query {
+        // Update the value of the second section
+        text.sections[1].value = player_progress.score.to_string();
+    }
 }
 
-fn reset_bricks(commands: &mut Commands, query: &Query<Entity, With<Brick>>) {
+fn despawn_bricks(mut commands: Commands, query: Query<Entity, With<Brick>>) {
     for entity in query.iter() {
         commands.entity(entity).despawn();
     }
 }
 
-fn clear_balls(commands: &mut Commands, query: &Query<Entity, With<Ball>>) {
+fn despawn_balls(mut commands: Commands, query: Query<Entity, With<Ball>>) {
     for entity in query.iter() {
         commands.entity(entity).despawn();
     }
 }
 
-fn spawn_bricks(commands: &mut Commands, assets: &Res<GameAssets>) {
+fn spawn_bricks(mut commands: Commands, assets: Res<GameAssets>) {
     for x in 0..10 {
         for y in 0..4 {
             let brick_sprites = [
@@ -143,21 +208,21 @@ fn get_wall_collision_direction(position: Vec3) -> Option<Collision> {
         Some(Collision::Right)
     } else if position.y + BALL_SIZE / 2. > WIN_HEIGHT / 2. {
         Some(Collision::Bottom)
-    } else if position.y - BALL_SIZE / 2. < -WIN_HEIGHT / 2. {
-        Some(Collision::Top)
     } else {
         None
     }
 }
 
-fn collision_sounds(
+fn on_ball_collision(
     mut events: EventReader<BallCollisionEvent>,
     audio: Res<Audio>,
     assets: Res<GameAssets>,
+    mut score: ResMut<PlayerProgress>,
 ) {
     for event in events.iter() {
         match event.0 {
             BallCollisionType::Brick => {
+                score.score += 10.0;
                 audio.play(assets.audio.drop_004.clone());
             }
             BallCollisionType::Paddle => {
@@ -166,6 +231,17 @@ fn collision_sounds(
             BallCollisionType::Wall => {
                 audio.play(assets.audio.drop_003.clone());
             }
+        }
+    }
+}
+
+fn on_ball_loss(
+    mut ball_loss_events: EventReader<BallLossEvent>,
+    mut player_progress: ResMut<PlayerProgress>,
+) {
+    for _ in ball_loss_events.iter() {
+        if player_progress.ball_count > 0 {
+            player_progress.ball_count -= 1;
         }
     }
 }

@@ -2,23 +2,36 @@ use bevy::prelude::*;
 
 use crate::*;
 
+pub const BALL_SIZE: f32 = 22.;
+
+#[derive(Component, Default)]
+pub struct Ball {
+    pub direction: Vec2,
+    pub speed: f32,
+    pub curve: f32,
+}
+
+pub struct BallCollisionEvent(pub BallCollisionType);
+
+pub enum BallCollisionType {
+    Wall,
+    Paddle,
+    Brick,
+}
+
+pub struct BallLossEvent;
 pub struct BallPlugin;
 
 impl Plugin for BallPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(check_collisions.before(ball_movement))
-            .add_system(ball_movement);
-    }
-}
-
-pub struct SpawnBallCommand;
-
-impl Command for SpawnBallCommand {
-    fn write(self, world: &mut World) {
-        let assets = world.get_resource::<GameAssets>();
-        if let Some(assets) = assets {
-            world.spawn(BallBundle::new(assets.image.ball.clone()));
-        }
+        app.add_system_set(
+            SystemSet::on_update(GameState::InGame)
+                .with_system(check_collisions.before(ball_movement))
+                .with_system(ball_movement)
+                .with_system(ball_loss),
+        )
+        .add_event::<BallCollisionEvent>()
+        .add_event::<BallLossEvent>();
     }
 }
 
@@ -65,6 +78,19 @@ fn ball_movement(time: Res<Time>, mut query: Query<(&mut Ball, &mut Transform)>)
     }
 }
 
+fn ball_loss(
+    mut commands: Commands,
+    mut ball_loss_event: EventWriter<BallLossEvent>,
+    mut ball_query: Query<(Entity, &mut Transform), With<Ball>>,
+) {
+    for (entity, ball_transform) in ball_query.iter_mut() {
+        if ball_transform.translation.y < -WIN_HEIGHT / 2. {
+            commands.entity(entity).despawn();
+            ball_loss_event.send(BallLossEvent);
+        }
+    }
+}
+
 fn check_collisions(
     mut commands: Commands,
     mut collision_events: EventWriter<BallCollisionEvent>,
@@ -80,6 +106,8 @@ fn check_collisions(
         Without<Ball>,
     >,
 ) {
+    let mut bricks_to_despawn = Vec::new();
+
     for (mut ball, ball_collider, ball_transform) in ball_query.iter_mut() {
         let mut collision = get_wall_collision_direction(ball_transform.translation);
 
@@ -98,7 +126,9 @@ fn check_collisions(
 
                 if collision.is_some() {
                     if brick.is_some() {
-                        commands.entity(entity).despawn();
+                        if !bricks_to_despawn.contains(&entity) {
+                            bricks_to_despawn.push(entity);
+                        }
                         collision_events.send(BallCollisionEvent(BallCollisionType::Brick));
                     } else if let Some(paddle) = paddle {
                         // Reflection based on paddle hit point
@@ -108,7 +138,6 @@ fn check_collisions(
                         // Curve balls
                         if paddle.speed.abs() > 12. {
                             ball.curve = paddle.speed.clamp(-50., 50.) / 50.;
-                            info!(ball.curve);
                         }
 
                         // Bounce up
@@ -129,8 +158,12 @@ fn check_collisions(
             _ => {}
         }
     }
+
+    for entity in bricks_to_despawn.iter() {
+        commands.entity(*entity).despawn();
+    }
 }
 
-pub fn spawn_ball(commands: &mut Commands, assets: &Res<GameAssets>) {
+pub fn spawn_ball(mut commands: Commands, assets: Res<GameAssets>) {
     commands.spawn(BallBundle::new(assets.image.ball.clone()));
 }

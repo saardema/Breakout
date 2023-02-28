@@ -1,29 +1,27 @@
 use bevy::{input::mouse::MouseMotion, prelude::*, window::CursorGrabMode};
 
-use crate::{
-    reset_bricks, spawn_ball, spawn_bricks, Brick, GameAssets, Paddle, PADDLE_WIDTH, WIN_WIDTH,
-};
+use crate::*;
 
 pub struct GameInputPlugin;
 
 impl Plugin for GameInputPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(mouse_motion)
-            .add_system(cursor_grab)
-            .add_system(keyboard_input);
+        app.add_system_set(
+            SystemSet::on_update(GameState::InGame)
+                .with_system(mouse_motion)
+                .with_system(cursor_grab),
+        )
+        .add_system(keyboard_input);
     }
 }
 
-fn keyboard_input(
-    kb: Res<Input<KeyCode>>,
-    mut commands: Commands,
-    query: Query<Entity, With<Brick>>,
-    assets: Res<GameAssets>,
-) {
-    if kb.just_pressed(KeyCode::R) {
-        reset_bricks(&mut commands, &query);
-        spawn_bricks(&mut commands, &assets);
-        spawn_ball(&mut commands, &assets);
+fn keyboard_input(kb: Res<Input<KeyCode>>, mut state: ResMut<State<GameState>>) {
+    if kb.just_pressed(KeyCode::Escape) && state.current() != &GameState::PreGame {
+        state.set(GameState::PreGame).unwrap();
+    }
+
+    if kb.just_pressed(KeyCode::Space) && state.current() == &GameState::PreGame {
+        state.set(GameState::InGame).unwrap();
     }
 }
 
@@ -37,11 +35,10 @@ fn mouse_motion(
 
         paddle.speed = ev.delta.x;
 
-        if transform.translation.x < -WIN_WIDTH / 2. + PADDLE_WIDTH / 2. {
-            transform.translation.x = -WIN_WIDTH / 2. + PADDLE_WIDTH / 2.;
-        } else if transform.translation.x > WIN_WIDTH / 2. - PADDLE_WIDTH / 2. {
-            transform.translation.x = WIN_WIDTH / 2. - PADDLE_WIDTH / 2.;
-        }
+        transform.translation.x = transform.translation.x.clamp(
+            -WIN_WIDTH / 2. + PADDLE_WIDTH / 2.,
+            WIN_WIDTH / 2. - PADDLE_WIDTH / 2.,
+        );
     }
 }
 
@@ -55,11 +52,11 @@ fn cursor_grab(
     if btn.just_pressed(MouseButton::Left) {
         // if you want to use the cursor, but not let it leave the window,
         // use `Confined` mode:
-        window.set_cursor_grab_mode(CursorGrabMode::Confined);
+        // window.set_cursor_grab_mode(CursorGrabMode::Confined);
 
         // for a game that doesn't use the cursor (like a shooter):
         // use `Locked` mode to keep the cursor in one place
-        // window.set_cursor_grab_mode(CursorGrabMode::Locked);
+        window.set_cursor_grab_mode(CursorGrabMode::Locked);
         // also hide the cursor
         window.set_cursor_visibility(false);
     }
