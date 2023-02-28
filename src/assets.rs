@@ -19,6 +19,9 @@ pub struct ImageHandles {
     pub brick_green: Handle<Image>,
     pub brick_red: Handle<Image>,
     pub brick_yellow: Handle<Image>,
+    pub brick_orange: Handle<Image>,
+    pub brick_cyan: Handle<Image>,
+    pub brick_light_green: Handle<Image>,
 }
 #[derive(Resource)]
 pub struct GameAssets {
@@ -40,6 +43,9 @@ fn asset_loading(mut commands: Commands, assets: Res<AssetServer>) {
             brick_green: assets.load("images/brick_green.png"),
             brick_red: assets.load("images/brick_red.png"),
             brick_yellow: assets.load("images/brick_yellow.png"),
+            brick_orange: assets.load("images/brick_orange.png"),
+            brick_cyan: assets.load("images/brick_cyan.png"),
+            brick_light_green: assets.load("images/brick_light_green.png"),
         },
     });
 }

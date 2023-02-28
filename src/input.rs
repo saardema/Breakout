@@ -6,9 +6,13 @@ pub struct GameInputPlugin;
 
 impl Plugin for GameInputPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system_set(SystemSet::on_update(GameState::InGame).with_system(mouse_motion))
-            .add_system(cursor_grab)
-            .add_system(keyboard_input);
+        app.add_system_set(
+            SystemSet::on_update(GameState::InGame)
+                .with_system(mouse_motion)
+                .with_system(launch_ball),
+        )
+        .add_system(cursor_grab)
+        .add_system(keyboard_input);
     }
 }
 
@@ -61,5 +65,17 @@ fn cursor_grab(
     if key.just_pressed(KeyCode::Escape) {
         window.set_cursor_grab_mode(CursorGrabMode::None);
         window.set_cursor_visibility(true);
+    }
+}
+
+fn launch_ball(
+    mut commands: Commands,
+    query: Query<Entity, With<AttachedToPaddle>>,
+    kb: Res<Input<KeyCode>>,
+) {
+    if kb.just_pressed(KeyCode::Space) {
+        if let Ok(entity) = query.get_single() {
+            commands.entity(entity).remove::<AttachedToPaddle>();
+        }
     }
 }

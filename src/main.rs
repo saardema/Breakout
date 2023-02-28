@@ -21,14 +21,16 @@ mod ui;
 #[derive(Resource)]
 pub struct PlayerProgress {
     score: f32,
-    ball_count: u16,
+    balls_remaining: u16,
+    level: u16,
 }
 
 impl Default for PlayerProgress {
     fn default() -> Self {
         PlayerProgress {
             score: 0.,
-            ball_count: 3,
+            balls_remaining: 3,
+            level: 1,
         }
     }
 }
@@ -37,7 +39,6 @@ impl Default for PlayerProgress {
 enum GameState {
     PreGame,
     InGame,
-    Change,
 }
 
 fn main() {
@@ -60,10 +61,11 @@ fn main() {
         .add_state(GameState::InGame)
         .add_system_set(
             SystemSet::on_enter(GameState::InGame)
-                .with_system(reset_score)
+                .with_system(reset_player_progress.before(spawn_ball_count))
                 .with_system(spawn_ball_count)
                 .with_system(spawn_bricks)
                 .with_system(spawn_paddle)
+                .with_system(spawn_level_text.before(spawn_score_text))
                 .with_system(spawn_score_text)
                 .with_system(spawn_ball),
         )
@@ -71,14 +73,16 @@ fn main() {
             SystemSet::on_update(GameState::InGame)
                 .with_system(increase_ball_speed)
                 .with_system(on_ball_loss)
-                .with_system(text_update_system),
+                .with_system(update_ball_count)
+                .with_system(update_level_text)
+                .with_system(update_score_text),
         )
         .add_system_set(
             SystemSet::on_exit(GameState::InGame)
                 .with_system(despawn_balls)
                 .with_system(despawn_ball_count)
                 .with_system(despawn_paddle)
-                .with_system(despawn_text)
+                .with_system(despawn_all_text)
                 .with_system(despawn_bricks),
         )
         .insert_resource(PlayerProgress::default())
@@ -99,7 +103,7 @@ fn increase_ball_speed(mut query: Query<&mut Ball>, time: Res<Time>) {
     }
 }
 
-fn reset_score(mut player_progress: ResMut<PlayerProgress>) {
+fn reset_player_progress(mut player_progress: ResMut<PlayerProgress>) {
     *player_progress = PlayerProgress::default();
 }
 
@@ -117,12 +121,15 @@ fn despawn_balls(mut commands: Commands, query: Query<Entity, With<Ball>>) {
 
 fn spawn_bricks(mut commands: Commands, assets: Res<GameAssets>) {
     for x in 0..10 {
-        for y in 0..4 {
+        for y in 0..7 {
             let brick_sprites = [
-                &assets.image.brick_blue,
-                &assets.image.brick_green,
-                &assets.image.brick_yellow,
                 &assets.image.brick_red,
+                &assets.image.brick_orange,
+                &assets.image.brick_yellow,
+                &assets.image.brick_green,
+                &assets.image.brick_light_green,
+                &assets.image.brick_cyan,
+                &assets.image.brick_blue,
             ];
 
             commands
@@ -131,7 +138,7 @@ fn spawn_bricks(mut commands: Commands, assets: Res<GameAssets>) {
                     texture: brick_sprites[y].clone(),
                     transform: Transform::from_xyz(
                         x as f32 * BRICK_WIDTH - 4.5 * BRICK_WIDTH,
-                        y as f32 * BRICK_HEIGHT + 200.,
+                        WIN_HEIGHT / 2. - y as f32 * BRICK_HEIGHT - 100.,
                         0.,
                     ),
                     ..default()
@@ -151,7 +158,7 @@ fn spawn_paddle(mut commands: Commands, assets: Res<GameAssets>) {
     commands
         .spawn(Paddle { speed: 0. })
         .insert(SpriteBundle {
-            transform: Transform::from_xyz(0., -320., 0.),
+            transform: Transform::from_xyz(0., -280., 0.),
             texture: assets.image.paddle.clone(),
             ..default()
         })
@@ -195,12 +202,14 @@ fn on_ball_collision(
 }
 
 fn on_ball_loss(
+    mut commands: Commands,
     mut ball_loss_events: EventReader<BallLossEvent>,
     mut player_progress: ResMut<PlayerProgress>,
 ) {
     for _ in ball_loss_events.iter() {
-        if player_progress.ball_count > 0 {
-            player_progress.ball_count -= 1;
+        if player_progress.balls_remaining > 0 {
+            player_progress.balls_remaining -= 1;
+            commands.add(SpawnBallCommand);
         }
     }
 }

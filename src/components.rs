@@ -17,4 +17,10 @@ pub struct Collider {
 pub struct ScoreText;
 
 #[derive(Component)]
+pub struct LevelText;
+
+#[derive(Component)]
 pub struct GameOverText;
+
+#[derive(Component)]
+pub struct AttachedToPaddle;

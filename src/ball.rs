@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{ecs::system::Command, prelude::*};
 
 use crate::*;
 
@@ -35,46 +35,31 @@ impl Plugin for BallPlugin {
     }
 }
 
-#[derive(Bundle)]
-pub struct BallBundle {
-    pub ball: Ball,
-    pub sprite_bundle: SpriteBundle,
-    pub collider: Collider,
-}
-
-impl BallBundle {
-    fn new(texture: Handle<Image>) -> Self {
-        Self {
-            ball: Ball {
-                direction: Vec2::new(0., 1.),
-                speed: 400.,
-                curve: 0.,
-            },
-            sprite_bundle: SpriteBundle {
-                texture,
-                transform: Transform::from_xyz(0., 50., 0.),
-                ..default()
-            },
-            collider: Collider {
-                size: Vec2::splat(BALL_SIZE),
-            },
-        }
-    }
-}
-
-fn ball_movement(time: Res<Time>, mut query: Query<(&mut Ball, &mut Transform)>) {
-    for (mut ball, mut ball_transform) in query.iter_mut() {
-        // Curveball
-        if ball.curve.abs() > 0.09 {
-            ball.curve *= 0.95;
-            ball.direction = Vec2::from_angle(ball.curve * 0.06).rotate(ball.direction);
+fn ball_movement(
+    time: Res<Time>,
+    mut balls_query: Query<(&mut Ball, &mut Transform, Option<&AttachedToPaddle>)>,
+    paddle_query: Query<&Transform, (With<Paddle>, Without<Ball>)>,
+) {
+    for (mut ball, mut ball_transform, attached) in balls_query.iter_mut() {
+        if attached.is_some() {
+            if let Ok(paddle_transform) = paddle_query.get_single() {
+                ball_transform.translation.x = paddle_transform.translation.x;
+                ball_transform.translation.y =
+                    paddle_transform.translation.y + PADDLE_HEIGHT / 2. + BALL_SIZE / 2.;
+            }
         } else {
-            ball.curve = 0.;
-        }
+            // Curveball
+            if ball.curve.abs() > 0.09 {
+                ball.curve *= 0.95;
+                ball.direction = Vec2::from_angle(ball.curve * 0.06).rotate(ball.direction);
+            } else {
+                ball.curve = 0.;
+            }
 
-        // Translate
-        ball_transform.translation +=
-            ball.direction.extend(0.).normalize() * ball.speed * time.delta_seconds().min(1.);
+            // Translate
+            ball_transform.translation +=
+                ball.direction.extend(0.).normalize() * ball.speed * time.delta_seconds().min(1.);
+        }
     }
 }
 
@@ -94,7 +79,7 @@ fn ball_loss(
 fn check_collisions(
     mut commands: Commands,
     mut collision_events: EventWriter<BallCollisionEvent>,
-    mut ball_query: Query<(&mut Ball, &Collider, &mut Transform)>,
+    mut ball_query: Query<(&mut Ball, &Collider, &mut Transform), Without<AttachedToPaddle>>,
     mut collider_query: Query<
         (
             Entity,
@@ -164,6 +149,32 @@ fn check_collisions(
     }
 }
 
-pub fn spawn_ball(mut commands: Commands, assets: Res<GameAssets>) {
-    commands.spawn(BallBundle::new(assets.image.ball.clone()));
+pub fn spawn_ball(mut commands: Commands) {
+    commands.add(SpawnBallCommand);
+}
+
+pub struct SpawnBallCommand;
+
+impl Command for SpawnBallCommand {
+    fn write(self, world: &mut World) {
+        let assets = world.get_resource::<GameAssets>();
+        if let Some(assets) = assets {
+            world.spawn((
+                Ball {
+                    direction: Vec2::new(0., 1.),
+                    speed: 400.,
+                    curve: 0.,
+                },
+                SpriteBundle {
+                    texture: assets.image.ball.clone(),
+                    transform: Transform::from_xyz(0., 50., 0.),
+                    ..default()
+                },
+                Collider {
+                    size: Vec2::splat(BALL_SIZE),
+                },
+                AttachedToPaddle,
+            ));
+        }
+    }
 }
