@@ -7,7 +7,6 @@ impl Plugin for GameAssetsPlugin {
         app.add_startup_system_to_stage(StartupStage::PreStartup, asset_loading);
     }
 }
-
 pub struct AudioHandles {
     pub drop_002: Handle<AudioSource>,
     pub drop_003: Handle<AudioSource>,

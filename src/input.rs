@@ -6,12 +6,9 @@ pub struct GameInputPlugin;
 
 impl Plugin for GameInputPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system_set(
-            SystemSet::on_update(GameState::InGame)
-                .with_system(mouse_motion)
-                .with_system(cursor_grab),
-        )
-        .add_system(keyboard_input);
+        app.add_system_set(SystemSet::on_update(GameState::InGame).with_system(mouse_motion))
+            .add_system(cursor_grab)
+            .add_system(keyboard_input);
     }
 }
 

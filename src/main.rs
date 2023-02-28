@@ -3,6 +3,7 @@ use ball::*;
 use bevy::{prelude::*, sprite::collide_aabb::*};
 use components::*;
 use input::*;
+use ui::*;
 
 const WIN_WIDTH: f32 = 800.;
 const WIN_HEIGHT: f32 = 800.;
@@ -15,6 +16,7 @@ mod assets;
 mod ball;
 mod components;
 mod input;
+mod ui;
 
 #[derive(Resource)]
 pub struct PlayerProgress {
@@ -58,9 +60,10 @@ fn main() {
         .add_system_set(
             SystemSet::on_enter(GameState::InGame)
                 .with_system(reset_score)
+                .with_system(spawn_ball_count)
                 .with_system(spawn_bricks)
                 .with_system(spawn_paddle)
-                .with_system(spawn_score_text)
+                // .with_system(spawn_score_text)
                 .with_system(spawn_ball),
         )
         .add_system_set(
@@ -72,6 +75,7 @@ fn main() {
         .add_system_set(
             SystemSet::on_exit(GameState::InGame)
                 .with_system(despawn_balls)
+                .with_system(despawn_ball_count)
                 .with_system(despawn_paddle)
                 .with_system(despawn_text)
                 .with_system(despawn_bricks),
@@ -80,12 +84,6 @@ fn main() {
         .add_startup_system(spawn_camera)
         .add_system_to_stage(CoreStage::Last, on_ball_collision)
         .run();
-}
-
-fn despawn_text(mut commands: Commands, query: Query<(Entity, &Text)>) {
-    for (entity, _) in query.iter() {
-        commands.entity(entity).despawn();
-    }
 }
 
 fn despawn_paddle(mut commands: Commands, query: Query<(Entity, &Paddle)>) {
@@ -102,46 +100,6 @@ fn increase_ball_speed(mut query: Query<&mut Ball>, time: Res<Time>) {
 
 fn reset_score(mut player_progress: ResMut<PlayerProgress>) {
     *player_progress = PlayerProgress::default();
-}
-
-fn spawn_score_text(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn((
-        // Create a TextBundle that has a Text with a list of sections.
-        TextBundle::from_sections([
-            TextSection::new(
-                "Score: ",
-                TextStyle {
-                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                    font_size: 60.0,
-                    color: Color::WHITE,
-                },
-            ),
-            TextSection::from_style(TextStyle {
-                font: asset_server.load("fonts/FiraMono-Medium.ttf"),
-                font_size: 60.0,
-                color: Color::GOLD,
-            }),
-        ])
-        .with_style(Style {
-            margin: UiRect {
-                left: Val::Px(10.),
-                top: Val::Px(10.),
-                ..default()
-            },
-            ..default()
-        }),
-        ScoreText,
-    ));
-}
-
-fn text_update_system(
-    mut query: Query<&mut Text, With<ScoreText>>,
-    player_progress: Res<PlayerProgress>,
-) {
-    for mut text in &mut query {
-        // Update the value of the second section
-        text.sections[1].value = player_progress.score.to_string();
-    }
 }
 
 fn despawn_bricks(mut commands: Commands, query: Query<Entity, With<Brick>>) {
