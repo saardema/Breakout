@@ -13,6 +13,8 @@ const PADDLE_HEIGHT: f32 = 24.;
 const BRICK_WIDTH: f32 = 64.;
 const BRICK_HEIGHT: f32 = 32.;
 const BG_COLOR: Color = Color::rgba(0.218, 0.554, 0.777, 0.1);
+const BASE_BRICK_SCORE: f32 = 10.;
+const SCORE_MULTIPLIER_TIMEOUT: f32 = 1.;
 
 mod assets;
 mod ball;
@@ -96,12 +98,16 @@ fn main() {
         .add_startup_system(spawn_camera)
         .add_system(on_window_focus)
         .add_system(on_pause)
-        .add_system_to_stage(CoreStage::Last, on_ball_collision)
+        .add_system_to_stage(CoreStage::Last, ball_collision_sounds)
         //
         // Resources
         .insert_resource(PlayerProgress::default())
         .insert_resource(TransitionTimer(Timer::new(
             Duration::from_secs(2),
+            TimerMode::Once,
+        )))
+        .insert_resource(BrickCollisionTimer(Timer::new(
+            Duration::from_secs_f32(SCORE_MULTIPLIER_TIMEOUT),
             TimerMode::Once,
         )))
         .insert_resource(ClearColor(BG_COLOR))
@@ -123,7 +129,6 @@ fn main() {
         // Playing state
         .add_system_set(
             SystemSet::on_enter(GameState::Playing)
-                .with_system(reset_player_progress.before(spawn_ball_count))
                 .with_system(spawn_ball_count)
                 .with_system(spawn_bricks)
                 .with_system(spawn_paddle)
@@ -136,6 +141,7 @@ fn main() {
                 .with_system(increase_ball_speed)
                 .with_system(on_ball_loss)
                 .with_system(next_level)
+                .with_system(update_score)
                 .with_system(update_ball_count)
                 .with_system(update_level_text)
                 .with_system(update_score_text),
@@ -259,16 +265,14 @@ fn get_wall_collision_direction(position: Vec3) -> Option<Collision> {
     }
 }
 
-fn on_ball_collision(
+fn ball_collision_sounds(
     mut events: EventReader<BallCollisionEvent>,
     audio: Res<Audio>,
     assets: Res<GameAssets>,
-    mut score: ResMut<PlayerProgress>,
 ) {
     for event in events.iter() {
         match event.0 {
             BallCollisionType::Brick => {
-                score.score += 10.0;
                 audio.play(assets.audio.drop_004.clone());
             }
             BallCollisionType::Paddle => {
@@ -277,6 +281,30 @@ fn on_ball_collision(
             BallCollisionType::Wall => {
                 audio.play(assets.audio.drop_003.clone());
             }
+        }
+    }
+}
+
+fn update_score(
+    mut events: EventReader<BallCollisionEvent>,
+    mut player_progress: ResMut<PlayerProgress>,
+    mut timer: ResMut<BrickCollisionTimer>,
+    time: Res<Time>,
+) {
+    timer.0.tick(time.delta());
+
+    for event in events.iter() {
+        if event.0 == BallCollisionType::Brick {
+            let mut score_increment = BASE_BRICK_SCORE;
+
+            if !timer.0.finished() {
+                let bonus = (SCORE_MULTIPLIER_TIMEOUT - timer.0.elapsed_secs()) * 100.;
+                score_increment += bonus;
+                info!("{:?}", bonus);
+            }
+
+            player_progress.score += score_increment;
+            timer.0.reset();
         }
     }
 }
