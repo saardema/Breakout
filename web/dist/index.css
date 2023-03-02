@@ -1,1 +1,15 @@
-text{display:none}body{margin:0;display:flex;align-items:center;justify-content:center;background:#000}canvas{outline:none}
+text {
+  display: none;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+}
+
+canvas {
+  outline: none;
+}
