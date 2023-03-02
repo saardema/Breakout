@@ -36,14 +36,14 @@ pub fn spawn_title_text(mut commands: Commands, asset_server: Res<AssetServer>) 
                 "Breakout!",
                 TextStyle {
                     font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                    font_size: 120.0,
+                    font_size: 150.0,
                     color: Color::WHITE,
                 },
             )
             .with_alignment(TextAlignment::CENTER),
             ..default()
         })
-        .insert(Transform::from_xyz(0., 0., 1.))
+        .insert(Transform::from_xyz(0., 120., 1.))
         .insert(TitleText);
 }
 

@@ -53,7 +53,7 @@ impl Default for PlayerProgress {
         PlayerProgress {
             score: 0.,
             balls_remaining: 3,
-            level: 1,
+            level: 4,
         }
     }
 }
