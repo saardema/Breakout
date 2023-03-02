@@ -159,6 +159,7 @@ pub struct SpawnBallCommand;
 impl Command for SpawnBallCommand {
     fn write(self, world: &mut World) {
         let assets = world.get_resource::<GameAssets>();
+        let progress = world.get_resource::<PlayerProgress>();
         if let Some(assets) = assets {
             world.spawn((
                 Ball {
@@ -168,13 +169,13 @@ impl Command for SpawnBallCommand {
                 },
                 SpriteBundle {
                     texture: assets.image.ball.clone(),
-                    transform: Transform::from_xyz(-400. + BALL_SIZE / 2., 50., 0.),
+                    transform: Transform::from_xyz(0., 0., 0.),
                     ..default()
                 },
                 Collider {
                     size: Vec2::splat(BALL_SIZE),
                 },
-                // AttachedToPaddle,
+                AttachedToPaddle,
             ));
         }
     }
