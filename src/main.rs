@@ -17,6 +17,7 @@ const BASE_BRICK_SCORE: f32 = 10.;
 const SCORE_MULTIPLIER_TIMEOUT: f32 = 1.;
 const SCORE_MULTIPLIER: f32 = 50.;
 const SCORE_ANIM_MAX_DURATION: f32 = 0.6;
+const EXTRA_BALL_COUNT: u8 = 3;
 
 mod assets;
 mod ball;
@@ -44,7 +45,7 @@ pub struct AttachedToPaddle;
 #[derive(Resource)]
 pub struct PlayerProgress {
     score: f32,
-    balls_remaining: u16,
+    extra_balls_remaining: u8,
     level: u16,
 }
 
@@ -52,7 +53,7 @@ impl Default for PlayerProgress {
     fn default() -> Self {
         PlayerProgress {
             score: 0.,
-            balls_remaining: 3,
+            extra_balls_remaining: EXTRA_BALL_COUNT,
             level: 1,
         }
     }
@@ -100,6 +101,7 @@ fn main() {
         .add_event::<ScoreIncrementEvent>()
         //
         // State independent systems
+        .add_startup_system(spawn_background)
         .add_startup_system(spawn_camera)
         .add_system(on_window_focus)
         .add_system(on_pause)
@@ -213,8 +215,8 @@ fn reset_player_progress(mut player_progress: ResMut<PlayerProgress>) {
 }
 
 fn spawn_bricks(mut commands: Commands, assets: Res<GameAssets>) {
-    for x in 0..10 {
-        for y in 0..6 {
+    for x in 0..1 {
+        for y in 0..1 {
             let brick_sprites = [
                 &assets.image.brick_red,
                 &assets.image.brick_orange,
@@ -328,8 +330,8 @@ fn on_ball_loss(
     mut state: ResMut<State<GameState>>,
 ) {
     for _ in ball_loss_events.iter() {
-        if player_progress.balls_remaining > 0 {
-            player_progress.balls_remaining -= 1;
+        if player_progress.extra_balls_remaining > 0 {
+            player_progress.extra_balls_remaining -= 1;
             commands.add(SpawnBallCommand);
         } else {
             state.set(GameState::GameOver).unwrap();
@@ -350,6 +352,7 @@ fn next_level(
 ) {
     if query.is_empty() {
         progress.level += 1;
+        progress.extra_balls_remaining = EXTRA_BALL_COUNT;
         state.set(GameState::LevelCompleted).unwrap();
     }
 }
