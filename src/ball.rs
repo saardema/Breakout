@@ -162,19 +162,19 @@ impl Command for SpawnBallCommand {
         if let Some(assets) = assets {
             world.spawn((
                 Ball {
-                    direction: Vec2::new(0., 1.),
+                    direction: Vec2::new(0.195, 1.),
                     speed: 400.,
                     curve: 0.,
                 },
                 SpriteBundle {
                     texture: assets.image.ball.clone(),
-                    transform: Transform::from_xyz(0., 50., 0.),
+                    transform: Transform::from_xyz(-400. + BALL_SIZE / 2., 50., 0.),
                     ..default()
                 },
                 Collider {
                     size: Vec2::splat(BALL_SIZE),
                 },
-                AttachedToPaddle,
+                // AttachedToPaddle,
             ));
         }
     }

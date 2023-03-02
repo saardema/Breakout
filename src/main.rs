@@ -15,11 +15,15 @@ const BRICK_HEIGHT: f32 = 32.;
 const BG_COLOR: Color = Color::rgba(0.218, 0.554, 0.777, 0.1);
 const BASE_BRICK_SCORE: f32 = 10.;
 const SCORE_MULTIPLIER_TIMEOUT: f32 = 1.;
+const SCORE_MULTIPLIER: f32 = 50.;
+const SCORE_ANIM_MAX_DURATION: f32 = 0.6;
 
 mod assets;
 mod ball;
 mod input;
 mod ui;
+
+pub struct ScoreIncrementEvent(f32);
 
 #[derive(Component)]
 pub struct Brick;
@@ -68,7 +72,7 @@ pub struct GamePauseEvent {
 }
 
 #[derive(Resource)]
-struct BrickCollisionTimer(pub Timer);
+struct ScoreIncrementTimer(pub Timer);
 
 #[derive(Resource)]
 pub struct TransitionTimer(pub Timer);
@@ -93,6 +97,7 @@ fn main() {
         //
         // Events
         .add_event::<GamePauseEvent>()
+        .add_event::<ScoreIncrementEvent>()
         //
         // State independent systems
         .add_startup_system(spawn_camera)
@@ -106,13 +111,14 @@ fn main() {
             Duration::from_secs(2),
             TimerMode::Once,
         )))
-        .insert_resource(BrickCollisionTimer(Timer::new(
+        .insert_resource(ScoreIncrementTimer(Timer::new(
             Duration::from_secs_f32(SCORE_MULTIPLIER_TIMEOUT),
             TimerMode::Once,
         )))
         .insert_resource(ClearColor(BG_COLOR))
         //
         // Plugins
+        .add_plugin(UiPlugin)
         .add_plugin(BallPlugin)
         .add_plugin(GameInputPlugin)
         .add_plugin(GameAssetsPlugin)
@@ -279,30 +285,36 @@ fn ball_collision_sounds(
                 audio.play(assets.audio.drop_002.clone());
             }
             BallCollisionType::Wall => {
-                audio.play(assets.audio.drop_003.clone());
+                audio.play_with_settings(
+                    assets.audio.drop_003.clone(),
+                    PlaybackSettings {
+                        volume: 0.5,
+                        ..default()
+                    },
+                );
             }
         }
     }
 }
 
 fn update_score(
-    mut events: EventReader<BallCollisionEvent>,
+    mut collision_events: EventReader<BallCollisionEvent>,
+    mut score_events: EventWriter<ScoreIncrementEvent>,
     mut player_progress: ResMut<PlayerProgress>,
-    mut timer: ResMut<BrickCollisionTimer>,
+    mut timer: ResMut<ScoreIncrementTimer>,
     time: Res<Time>,
 ) {
     timer.0.tick(time.delta());
 
-    for event in events.iter() {
+    for event in collision_events.iter() {
         if event.0 == BallCollisionType::Brick {
             let mut score_increment = BASE_BRICK_SCORE;
 
             if !timer.0.finished() {
-                let bonus = (SCORE_MULTIPLIER_TIMEOUT - timer.0.elapsed_secs()) * 100.;
+                let bonus = (SCORE_MULTIPLIER_TIMEOUT - timer.0.elapsed_secs()) * SCORE_MULTIPLIER;
                 score_increment += bonus;
-                info!("{:?}", bonus);
             }
-
+            score_events.send(ScoreIncrementEvent(score_increment));
             player_progress.score += score_increment;
             timer.0.reset();
         }
@@ -337,7 +349,6 @@ fn next_level(
     mut progress: ResMut<PlayerProgress>,
 ) {
     if query.is_empty() {
-        print!("all bricks gone");
         progress.level += 1;
         state.set(GameState::LevelCompleted).unwrap();
     }
