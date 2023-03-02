@@ -163,7 +163,7 @@ impl Command for SpawnBallCommand {
             world.spawn((
                 Ball {
                     direction: Vec2::new(0.195, 1.),
-                    speed: 400.,
+                    speed: 400. + progress.unwrap().level as f32 * 50.,
                     curve: 0.,
                 },
                 SpriteBundle {
