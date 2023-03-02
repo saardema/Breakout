@@ -282,9 +282,9 @@ fn on_window_focus(
     mut pause_event: EventWriter<GamePauseEvent>,
 ) {
     for window in window_focused.iter() {
-        pause_event.send(GamePauseEvent {
-            should_pause: !window.focused,
-        })
+        if !window.focused {
+            pause_event.send(GamePauseEvent { should_pause: true });
+        }
     }
 }
 
