@@ -72,7 +72,11 @@ fn main() {
                 width: WIN_WIDTH,
                 height: WIN_HEIGHT,
                 resizable: false,
-                monitor: MonitorSelection::Index(0),
+                monitor: if cfg!(debug_assertions) {
+                    MonitorSelection::Index(0)
+                } else {
+                    MonitorSelection::Current
+                },
                 ..default()
             },
             ..default()
