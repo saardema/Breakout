@@ -110,8 +110,8 @@ pub fn spawn_score_text(mut commands: Commands, asset_server: Res<AssetServer>) 
                     color: Color::GOLD,
                 }),
             ])
-            .with_alignment(TextAlignment::TOP_RIGHT),
-            transform: Transform::from_xyz(5. * BRICK_WIDTH, WIN_HEIGHT / 2. - 10., 1.),
+            .with_alignment(TextAlignment::TOP_LEFT),
+            transform: Transform::from_xyz(-60., WIN_HEIGHT / 2. - 10., 1.),
             ..default()
         },
         ScoreText,
@@ -143,14 +143,13 @@ pub fn spawn_ball_count(
     assets: Res<GameAssets>,
     player_progress: Res<PlayerProgress>,
 ) {
-    const MARGIN: f32 = 20.;
-
     for i in 0..player_progress.balls_remaining {
-        let x = WIN_WIDTH / 2. - i as f32 * 40. - MARGIN;
+        let x = 5. * BRICK_WIDTH - i as f32 * 40. - BALL_SIZE / 2.;
+
         commands
             .spawn(SpriteBundle {
                 texture: assets.image.ball.clone(),
-                transform: Transform::from_xyz(x, WIN_HEIGHT / 2. - MARGIN, 0.),
+                transform: Transform::from_xyz(x, WIN_HEIGHT / 2. - 40., 0.),
                 ..default()
             })
             .insert(UiBall);
