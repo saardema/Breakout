@@ -67,6 +67,22 @@ pub fn spawn_game_over_text(mut commands: Commands, asset_server: Res<AssetServe
     });
 }
 
+pub fn spawn_level_done_text(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.spawn(Text2dBundle {
+        text: Text::from_section(
+            "Level complete",
+            TextStyle {
+                font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                font_size: 120.0,
+                color: Color::WHITE,
+            },
+        )
+        .with_alignment(TextAlignment::CENTER),
+        transform: Transform::from_xyz(0., 0., 1.),
+        ..default()
+    });
+}
+
 pub fn spawn_level_text(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
         Text2dBundle {
@@ -124,7 +140,7 @@ pub fn update_score_text(
 ) {
     for mut text in &mut query {
         // Update the value of the second section
-        text.sections[1].value = player_progress.score.to_string();
+        text.sections[1].value = player_progress.score.round().to_string();
     }
 }
 

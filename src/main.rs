@@ -56,6 +56,7 @@ impl Default for PlayerProgress {
 enum GameState {
     Start,
     Playing,
+    LevelCompleted,
     Paused,
     GameOver,
 }
@@ -63,6 +64,12 @@ enum GameState {
 pub struct GamePauseEvent {
     pub should_pause: bool,
 }
+
+#[derive(Resource)]
+struct BrickCollisionTimer(pub Timer);
+
+#[derive(Resource)]
+pub struct TransitionTimer(pub Timer);
 
 fn main() {
     App::new()
@@ -93,7 +100,7 @@ fn main() {
         //
         // Resources
         .insert_resource(PlayerProgress::default())
-        .insert_resource(GameOverTimer(Timer::new(
+        .insert_resource(TransitionTimer(Timer::new(
             Duration::from_secs(2),
             TimerMode::Once,
         )))
@@ -128,6 +135,7 @@ fn main() {
             SystemSet::on_update(GameState::Playing)
                 .with_system(increase_ball_speed)
                 .with_system(on_ball_loss)
+                .with_system(next_level)
                 .with_system(update_ball_count)
                 .with_system(update_level_text)
                 .with_system(update_score_text),
@@ -147,16 +155,26 @@ fn main() {
         //
         // GameOver state
         .add_system_set(SystemSet::on_enter(GameState::GameOver).with_system(spawn_game_over_text))
-        .add_system_set(SystemSet::on_update(GameState::GameOver).with_system(game_over_timer))
-        .add_system_set(SystemSet::on_exit(GameState::GameOver).with_system(despawn::<Text>))
+        .add_system_set(SystemSet::on_update(GameState::GameOver).with_system(transition_timer))
+        .add_system_set(
+            SystemSet::on_exit(GameState::GameOver)
+                .with_system(despawn::<Text>)
+                .with_system(reset_player_progress),
+        )
+        //
+        // Level transition state
+        .add_system_set(
+            SystemSet::on_enter(GameState::LevelCompleted).with_system(spawn_level_done_text),
+        )
+        .add_system_set(
+            SystemSet::on_update(GameState::LevelCompleted).with_system(transition_timer),
+        )
+        .add_system_set(SystemSet::on_exit(GameState::LevelCompleted).with_system(despawn::<Text>))
         .run();
 }
 
-#[derive(Resource, Default)]
-pub struct GameOverTimer(pub Timer);
-
-fn game_over_timer(
-    mut timer: ResMut<GameOverTimer>,
+fn transition_timer(
+    mut timer: ResMut<TransitionTimer>,
     mut state: ResMut<State<GameState>>,
     time: Res<Time>,
 ) {
@@ -164,7 +182,11 @@ fn game_over_timer(
 
     if timer.0.just_finished() {
         timer.0.reset();
-        state.set(GameState::Start).unwrap();
+        if state.current() == &GameState::GameOver {
+            state.set(GameState::Start).unwrap()
+        } else if state.current() == &GameState::LevelCompleted {
+            state.set(GameState::Playing).unwrap()
+        }
     }
 }
 
@@ -278,6 +300,18 @@ fn on_ball_loss(
 fn despawn<T: Component>(mut commands: Commands, entities: Query<Entity, With<T>>) {
     for entity in &entities {
         commands.entity(entity).despawn_recursive();
+    }
+}
+
+fn next_level(
+    query: Query<&Brick>,
+    mut state: ResMut<State<GameState>>,
+    mut progress: ResMut<PlayerProgress>,
+) {
+    if query.is_empty() {
+        print!("all bricks gone");
+        progress.level += 1;
+        state.set(GameState::LevelCompleted).unwrap();
     }
 }
 

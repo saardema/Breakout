@@ -13,6 +13,7 @@ pub struct Ball {
 
 pub struct BallCollisionEvent(pub BallCollisionType);
 
+#[derive(PartialEq)]
 pub enum BallCollisionType {
     Wall,
     Paddle,
