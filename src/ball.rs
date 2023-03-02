@@ -162,7 +162,7 @@ impl Command for SpawnBallCommand {
         if let Some(assets) = assets {
             world.spawn((
                 Ball {
-                    direction: Vec2::new(0.195, 1.),
+                    direction: Vec2::new(rand::random::<f32>() * 2. - 1., 1.),
                     speed: 400. + progress.unwrap().level as f32 * 50.,
                     curve: 0.,
                 },
