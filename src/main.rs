@@ -46,7 +46,7 @@ impl Default for PlayerProgress {
     fn default() -> Self {
         PlayerProgress {
             score: 0.,
-            balls_remaining: 0,
+            balls_remaining: 3,
             level: 1,
         }
     }
