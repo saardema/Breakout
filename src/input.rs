@@ -6,27 +6,17 @@ pub struct GameInputPlugin;
 
 impl Plugin for GameInputPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system_set(
-            SystemSet::on_update(GameState::InGame)
-                .with_system(mouse_motion)
-                .with_system(launch_ball),
-        )
-        .add_system(cursor_grab)
-        .add_system(keyboard_input);
+        app.add_system_set(SystemSet::on_update(GameState::Start).with_system(click_to_start))
+            .add_system_set(
+                SystemSet::on_update(GameState::Playing)
+                    .with_system(paddle_motion)
+                    .with_system(launch_ball),
+            )
+            .add_system(focus);
     }
 }
 
-fn keyboard_input(kb: Res<Input<KeyCode>>, mut state: ResMut<State<GameState>>) {
-    if kb.just_pressed(KeyCode::Escape) && state.current() != &GameState::PreGame {
-        state.set(GameState::PreGame).unwrap();
-    }
-
-    if kb.just_pressed(KeyCode::Space) && state.current() == &GameState::PreGame {
-        state.set(GameState::InGame).unwrap();
-    }
-}
-
-fn mouse_motion(
+fn paddle_motion(
     mut motion_evr: EventReader<MouseMotion>,
     mut q: Query<(&mut Transform, &mut Paddle)>,
 ) {
@@ -43,28 +33,36 @@ fn mouse_motion(
     }
 }
 
-fn cursor_grab(
+fn click_to_start(btn: Res<Input<MouseButton>>, mut state: ResMut<State<GameState>>) {
+    if btn.just_pressed(MouseButton::Left) {
+        state.set(GameState::Playing).unwrap();
+    }
+}
+
+fn focus(
     mut windows: ResMut<Windows>,
     btn: Res<Input<MouseButton>>,
     key: Res<Input<KeyCode>>,
+    mut pause_event: EventWriter<GamePauseEvent>,
 ) {
     let window = windows.get_primary_mut().unwrap();
 
     if btn.just_pressed(MouseButton::Left) {
-        // if you want to use the cursor, but not let it leave the window,
-        // use `Confined` mode:
-        // window.set_cursor_grab_mode(CursorGrabMode::Confined);
-
-        // for a game that doesn't use the cursor (like a shooter):
-        // use `Locked` mode to keep the cursor in one place
-        window.set_cursor_grab_mode(CursorGrabMode::Locked);
-        // also hide the cursor
+        window.set_cursor_grab_mode(CursorGrabMode::Confined);
         window.set_cursor_visibility(false);
+
+        println!("Left mouse unpause");
+        pause_event.send(GamePauseEvent {
+            should_pause: false,
+        })
     }
 
     if key.just_pressed(KeyCode::Escape) {
         window.set_cursor_grab_mode(CursorGrabMode::None);
         window.set_cursor_visibility(true);
+
+        println!("Escape pause");
+        pause_event.send(GamePauseEvent { should_pause: true })
     }
 }
 

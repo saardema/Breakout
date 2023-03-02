@@ -25,7 +25,7 @@ pub struct BallPlugin;
 impl Plugin for BallPlugin {
     fn build(&self, app: &mut App) {
         app.add_system_set(
-            SystemSet::on_update(GameState::InGame)
+            SystemSet::on_update(GameState::Playing)
                 .with_system(check_collisions.before(ball_movement))
                 .with_system(ball_movement)
                 .with_system(ball_loss),

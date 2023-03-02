@@ -1,9 +1,71 @@
 use crate::*;
 
-pub fn despawn_all_text(mut commands: Commands, query: Query<Entity, With<Text>>) {
-    for entity in &query {
-        commands.entity(entity).despawn();
-    }
+#[derive(Component)]
+pub struct ScoreText;
+
+#[derive(Component)]
+pub struct LevelText;
+
+#[derive(Component)]
+pub struct PlayText;
+
+#[derive(Component)]
+pub struct TitleText;
+
+#[derive(Component)]
+pub struct UiBall;
+
+pub fn spawn_title_text(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                "Breakout!",
+                TextStyle {
+                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                    font_size: 120.0,
+                    color: Color::WHITE,
+                },
+            )
+            .with_alignment(TextAlignment::CENTER),
+            ..default()
+        })
+        .insert(Transform::from_xyz(0., 0., 1.))
+        .insert(TitleText);
+}
+
+pub fn spawn_play_text(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                "Click to play",
+                TextStyle {
+                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                    font_size: 40.0,
+                    color: Color::WHITE,
+                },
+            )
+            .with_alignment(TextAlignment::CENTER),
+            ..default()
+        })
+        .insert(Transform::from_xyz(0., -200., 1.))
+        .insert(PlayText);
+}
+
+pub fn spawn_game_over_text(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                "Game over",
+                TextStyle {
+                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                    font_size: 120.0,
+                    color: Color::WHITE,
+                },
+            )
+            .with_alignment(TextAlignment::CENTER),
+            ..default()
+        })
+        .insert(Transform::from_xyz(0., 0., 1.));
 }
 
 pub fn spawn_level_text(mut commands: Commands, asset_server: Res<AssetServer>) {
@@ -86,9 +148,6 @@ pub fn update_level_text(
     }
 }
 
-#[derive(Component)]
-pub struct UiBall;
-
 pub fn spawn_ball_count(
     mut commands: Commands,
     assets: Res<GameAssets>,
@@ -105,12 +164,6 @@ pub fn spawn_ball_count(
                 ..default()
             })
             .insert(UiBall);
-    }
-}
-
-pub fn despawn_ball_count(mut commands: Commands, entities: Query<Entity, With<UiBall>>) {
-    for entity in &entities {
-        commands.entity(entity).despawn();
     }
 }
 

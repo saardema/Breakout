@@ -1,7 +1,8 @@
+use std::time::Duration;
+
 use assets::*;
 use ball::*;
-use bevy::{prelude::*, sprite::collide_aabb::*};
-use components::*;
+use bevy::{prelude::*, sprite::collide_aabb::*, window::WindowFocused};
 use input::*;
 use ui::*;
 
@@ -11,12 +12,28 @@ const PADDLE_WIDTH: f32 = 104.;
 const PADDLE_HEIGHT: f32 = 24.;
 const BRICK_WIDTH: f32 = 64.;
 const BRICK_HEIGHT: f32 = 32.;
+const BG_COLOR: Color = Color::rgba(0.218, 0.554, 0.777, 0.1);
 
 mod assets;
 mod ball;
-mod components;
 mod input;
 mod ui;
+
+#[derive(Component)]
+pub struct Brick;
+
+#[derive(Component)]
+pub struct Paddle {
+    pub speed: f32,
+}
+
+#[derive(Component)]
+pub struct Collider {
+    pub size: Vec2,
+}
+
+#[derive(Component)]
+pub struct AttachedToPaddle;
 
 #[derive(Resource)]
 pub struct PlayerProgress {
@@ -29,7 +46,7 @@ impl Default for PlayerProgress {
     fn default() -> Self {
         PlayerProgress {
             score: 0.,
-            balls_remaining: 3,
+            balls_remaining: 0,
             level: 1,
         }
     }
@@ -37,8 +54,14 @@ impl Default for PlayerProgress {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 enum GameState {
-    PreGame,
-    InGame,
+    Start,
+    Playing,
+    Paused,
+    GameOver,
+}
+
+pub struct GamePauseEvent {
+    pub should_pause: bool,
 }
 
 fn main() {
@@ -54,13 +77,42 @@ fn main() {
             },
             ..default()
         }))
-        .insert_resource(ClearColor(Color::rgb(0.218, 0.554, 0.777)))
+        //
+        // Events
+        .add_event::<GamePauseEvent>()
+        //
+        // State independent systems
+        .add_startup_system(spawn_camera)
+        .add_system(on_window_focus)
+        .add_system(on_pause)
+        .add_system_to_stage(CoreStage::Last, on_ball_collision)
+        // .add_system(print_state)
+        //
+        // Resources
+        .insert_resource(PlayerProgress::default())
+        .insert_resource(GameOverTimer(Timer::new(
+            Duration::from_secs(2),
+            TimerMode::Once,
+        )))
+        .insert_resource(ClearColor(BG_COLOR))
+        //
+        // Plugins
         .add_plugin(BallPlugin)
         .add_plugin(GameInputPlugin)
         .add_plugin(GameAssetsPlugin)
-        .add_state(GameState::InGame)
+        .add_state(GameState::Start)
+        //
+        // Start state
         .add_system_set(
-            SystemSet::on_enter(GameState::InGame)
+            SystemSet::on_enter(GameState::Start)
+                .with_system(spawn_play_text)
+                .with_system(spawn_title_text),
+        )
+        .add_system_set(SystemSet::on_exit(GameState::Start).with_system(despawn::<Text>))
+        //
+        // Playing state
+        .add_system_set(
+            SystemSet::on_enter(GameState::Playing)
                 .with_system(reset_player_progress.before(spawn_ball_count))
                 .with_system(spawn_ball_count)
                 .with_system(spawn_bricks)
@@ -70,7 +122,7 @@ fn main() {
                 .with_system(spawn_ball),
         )
         .add_system_set(
-            SystemSet::on_update(GameState::InGame)
+            SystemSet::on_update(GameState::Playing)
                 .with_system(increase_ball_speed)
                 .with_system(on_ball_loss)
                 .with_system(update_ball_count)
@@ -78,22 +130,38 @@ fn main() {
                 .with_system(update_score_text),
         )
         .add_system_set(
-            SystemSet::on_exit(GameState::InGame)
-                .with_system(despawn_balls)
-                .with_system(despawn_ball_count)
-                .with_system(despawn_paddle)
-                .with_system(despawn_all_text)
-                .with_system(despawn_bricks),
+            SystemSet::on_exit(GameState::Playing)
+                .with_system(despawn::<Ball>)
+                .with_system(despawn::<UiBall>)
+                .with_system(despawn::<Paddle>)
+                .with_system(despawn::<Text>)
+                .with_system(despawn::<Brick>),
         )
-        .insert_resource(PlayerProgress::default())
-        .add_startup_system(spawn_camera)
-        .add_system_to_stage(CoreStage::Last, on_ball_collision)
+        //
+        // Paused state
+        .add_system_set(SystemSet::on_enter(GameState::Paused).with_system(spawn_play_text))
+        .add_system_set(SystemSet::on_exit(GameState::Paused).with_system(despawn::<PlayText>))
+        //
+        // GameOver state
+        .add_system_set(SystemSet::on_enter(GameState::GameOver).with_system(spawn_game_over_text))
+        .add_system_set(SystemSet::on_update(GameState::GameOver).with_system(game_over_timer))
+        .add_system_set(SystemSet::on_exit(GameState::GameOver).with_system(despawn::<Text>))
         .run();
 }
 
-fn despawn_paddle(mut commands: Commands, query: Query<(Entity, &Paddle)>) {
-    for (entity, _) in query.iter() {
-        commands.entity(entity).despawn();
+#[derive(Resource, Default)]
+pub struct GameOverTimer(pub Timer);
+
+fn game_over_timer(
+    mut timer: ResMut<GameOverTimer>,
+    mut state: ResMut<State<GameState>>,
+    time: Res<Time>,
+) {
+    timer.0.tick(time.delta());
+
+    if timer.0.just_finished() {
+        timer.0.reset();
+        state.set(GameState::Start).unwrap();
     }
 }
 
@@ -107,28 +175,15 @@ fn reset_player_progress(mut player_progress: ResMut<PlayerProgress>) {
     *player_progress = PlayerProgress::default();
 }
 
-fn despawn_bricks(mut commands: Commands, query: Query<Entity, With<Brick>>) {
-    for entity in query.iter() {
-        commands.entity(entity).despawn();
-    }
-}
-
-fn despawn_balls(mut commands: Commands, query: Query<Entity, With<Ball>>) {
-    for entity in query.iter() {
-        commands.entity(entity).despawn();
-    }
-}
-
 fn spawn_bricks(mut commands: Commands, assets: Res<GameAssets>) {
     for x in 0..10 {
-        for y in 0..7 {
+        for y in 0..6 {
             let brick_sprites = [
                 &assets.image.brick_red,
                 &assets.image.brick_orange,
                 &assets.image.brick_yellow,
                 &assets.image.brick_green,
                 &assets.image.brick_light_green,
-                &assets.image.brick_cyan,
                 &assets.image.brick_blue,
             ];
 
@@ -205,11 +260,53 @@ fn on_ball_loss(
     mut commands: Commands,
     mut ball_loss_events: EventReader<BallLossEvent>,
     mut player_progress: ResMut<PlayerProgress>,
+    mut state: ResMut<State<GameState>>,
 ) {
     for _ in ball_loss_events.iter() {
         if player_progress.balls_remaining > 0 {
             player_progress.balls_remaining -= 1;
             commands.add(SpawnBallCommand);
+        } else {
+            state.set(GameState::GameOver).unwrap();
+        }
+    }
+}
+
+fn despawn<T: Component>(mut commands: Commands, entities: Query<Entity, With<T>>) {
+    for entity in &entities {
+        commands.entity(entity).despawn_recursive();
+    }
+}
+
+fn print_state(mut state: ResMut<State<GameState>>) {
+    if state.is_changed() {
+        info!("{:?}", state.current());
+    }
+}
+
+fn on_window_focus(
+    mut window_focused: EventReader<WindowFocused>,
+    mut pause_event: EventWriter<GamePauseEvent>,
+) {
+    for window in window_focused.iter() {
+        info!("Window focus: {}", window.focused);
+        pause_event.send(GamePauseEvent {
+            should_pause: !window.focused,
+        })
+    }
+}
+
+fn on_pause(mut pause_event: EventReader<GamePauseEvent>, mut state: ResMut<State<GameState>>) {
+    if state.current() != &GameState::GameOver {
+        for e in pause_event.iter() {
+            print!("{:?} -> ", state.current());
+            if e.should_pause && state.current() != &GameState::Paused {
+                state.overwrite_push(GameState::Paused).unwrap();
+                println!("Pause");
+            } else if !e.should_pause && state.current() == &GameState::Paused {
+                state.overwrite_pop().unwrap();
+                println!("Unpause");
+            }
         }
     }
 }
