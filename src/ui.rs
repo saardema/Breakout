@@ -52,78 +52,68 @@ pub fn spawn_play_text(mut commands: Commands, asset_server: Res<AssetServer>) {
 }
 
 pub fn spawn_game_over_text(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                "Game over",
-                TextStyle {
-                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                    font_size: 120.0,
-                    color: Color::WHITE,
-                },
-            )
-            .with_alignment(TextAlignment::CENTER),
-            ..default()
-        })
-        .insert(Transform::from_xyz(0., 0., 1.));
+    commands.spawn(Text2dBundle {
+        text: Text::from_section(
+            "Game over",
+            TextStyle {
+                font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                font_size: 120.0,
+                color: Color::WHITE,
+            },
+        )
+        .with_alignment(TextAlignment::CENTER),
+        transform: Transform::from_xyz(0., 0., 1.),
+        ..default()
+    });
 }
 
 pub fn spawn_level_text(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
-        TextBundle::from_sections([
-            TextSection::new(
-                "Level: ",
-                TextStyle {
-                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+        Text2dBundle {
+            text: Text::from_sections([
+                TextSection::new(
+                    "Level: ",
+                    TextStyle {
+                        font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                        font_size: 60.0,
+                        color: Color::WHITE,
+                    },
+                ),
+                TextSection::from_style(TextStyle {
+                    font: asset_server.load("fonts/FiraMono-Medium.ttf"),
                     font_size: 60.0,
-                    color: Color::WHITE,
-                },
-            ),
-            TextSection::from_style(TextStyle {
-                font: asset_server.load("fonts/FiraMono-Medium.ttf"),
-                font_size: 60.0,
-                color: Color::GOLD,
-            }),
-        ])
-        .with_style(Style {
-            margin: UiRect {
-                left: Val::Px(10.),
-                top: Val::Px(10.),
-                ..default()
-            },
+                    color: Color::GOLD,
+                }),
+            ]),
+            transform: Transform::from_xyz(-5. * BRICK_WIDTH, WIN_HEIGHT / 2. - 10., 1.),
             ..default()
-        }),
+        },
         LevelText,
     ));
 }
 
 pub fn spawn_score_text(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
-        TextBundle::from_sections([
-            TextSection::new(
-                "Score: ",
-                TextStyle {
-                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+        Text2dBundle {
+            text: Text::from_sections([
+                TextSection::new(
+                    "Score: ",
+                    TextStyle {
+                        font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                        font_size: 60.0,
+                        color: Color::WHITE,
+                    },
+                ),
+                TextSection::from_style(TextStyle {
+                    font: asset_server.load("fonts/FiraMono-Medium.ttf"),
                     font_size: 60.0,
-                    color: Color::WHITE,
-                },
-            ),
-            TextSection::from_style(TextStyle {
-                font: asset_server.load("fonts/FiraMono-Medium.ttf"),
-                font_size: 60.0,
-                color: Color::GOLD,
-            }),
-        ])
-        .with_style(Style {
-            // position_type: PositionType::Absolute,
-            justify_content: JustifyContent::Center,
-            margin: UiRect {
-                // left: Val::Px(10.),
-                top: Val::Px(10.),
-                ..default()
-            },
+                    color: Color::GOLD,
+                }),
+            ])
+            .with_alignment(TextAlignment::TOP_RIGHT),
+            transform: Transform::from_xyz(5. * BRICK_WIDTH, WIN_HEIGHT / 2. - 10., 1.),
             ..default()
-        }),
+        },
         ScoreText,
     ));
 }

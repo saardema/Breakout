@@ -86,7 +86,6 @@ fn main() {
         .add_system(on_window_focus)
         .add_system(on_pause)
         .add_system_to_stage(CoreStage::Last, on_ball_collision)
-        // .add_system(print_state)
         //
         // Resources
         .insert_resource(PlayerProgress::default())
@@ -278,18 +277,11 @@ fn despawn<T: Component>(mut commands: Commands, entities: Query<Entity, With<T>
     }
 }
 
-fn print_state(mut state: ResMut<State<GameState>>) {
-    if state.is_changed() {
-        info!("{:?}", state.current());
-    }
-}
-
 fn on_window_focus(
     mut window_focused: EventReader<WindowFocused>,
     mut pause_event: EventWriter<GamePauseEvent>,
 ) {
     for window in window_focused.iter() {
-        info!("Window focus: {}", window.focused);
         pause_event.send(GamePauseEvent {
             should_pause: !window.focused,
         })
@@ -299,13 +291,10 @@ fn on_window_focus(
 fn on_pause(mut pause_event: EventReader<GamePauseEvent>, mut state: ResMut<State<GameState>>) {
     if state.current() != &GameState::GameOver {
         for e in pause_event.iter() {
-            print!("{:?} -> ", state.current());
             if e.should_pause && state.current() != &GameState::Paused {
                 state.overwrite_push(GameState::Paused).unwrap();
-                println!("Pause");
             } else if !e.should_pause && state.current() == &GameState::Paused {
                 state.overwrite_pop().unwrap();
-                println!("Unpause");
             }
         }
     }

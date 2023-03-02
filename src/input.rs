@@ -51,7 +51,6 @@ fn focus(
         window.set_cursor_grab_mode(CursorGrabMode::Confined);
         window.set_cursor_visibility(false);
 
-        println!("Left mouse unpause");
         pause_event.send(GamePauseEvent {
             should_pause: false,
         })
@@ -61,7 +60,6 @@ fn focus(
         window.set_cursor_grab_mode(CursorGrabMode::None);
         window.set_cursor_visibility(true);
 
-        println!("Escape pause");
         pause_event.send(GamePauseEvent { should_pause: true })
     }
 }
