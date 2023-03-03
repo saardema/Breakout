@@ -246,7 +246,7 @@ pub fn update_ball_count(
     let mut i = 1;
 
     for mut visibility in query.iter_mut() {
-        visibility.is_visible = i <= player_progress.balls_remaining;
+        visibility.is_visible = i <= player_progress.extra_balls_remaining;
         i += 1;
     }
 }
