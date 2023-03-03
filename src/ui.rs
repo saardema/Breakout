@@ -1,6 +1,7 @@
 use crate::*;
 
 const UI_Z_VALUE: f32 = 100.;
+const BG_ANIM_SPEED: f32 = 0.1;
 
 #[derive(Component)]
 pub struct ScoreText;
@@ -25,11 +26,23 @@ pub struct Background;
 
 pub struct UiPlugin;
 
+#[derive(Resource)]
+pub struct BackgroundAnimationDirection(pub bool);
+
 pub fn spawn_background(mut commands: Commands, assets: Res<GameAssets>) {
     commands.spawn((
         SpriteBundle {
+            sprite: Sprite {
+                color: Color::Rgba {
+                    red: 0.2,
+                    green: 0.5,
+                    blue: 0.7,
+                    alpha: 0.8,
+                },
+                ..default()
+            },
             texture: assets.image.background.clone(),
-            transform: Transform::from_xyz(0., -1700., 0.),
+            transform: Transform::from_xyz(1000., 1000., 0.),
             ..default()
         },
         Background,
@@ -43,6 +56,25 @@ impl Plugin for UiPlugin {
             TimerMode::Once,
         )));
     }
+}
+
+pub fn animate_background(
+    mut query: Query<&mut Transform, With<Background>>,
+    mut direction: ResMut<BackgroundAnimationDirection>,
+) {
+    let mut transform = query.single_mut();
+
+    if transform.translation.x >= 1000. {
+        direction.0 = false
+    } else if transform.translation.x <= -1000. {
+        direction.0 = true
+    }
+
+    transform.translation.x += if direction.0 {
+        BG_ANIM_SPEED
+    } else {
+        -BG_ANIM_SPEED
+    };
 }
 
 pub fn spawn_title_text(mut commands: Commands, asset_server: Res<AssetServer>) {

@@ -12,7 +12,7 @@ const PADDLE_WIDTH: f32 = 104.;
 const PADDLE_HEIGHT: f32 = 24.;
 const BRICK_WIDTH: f32 = 64.;
 const BRICK_HEIGHT: f32 = 32.;
-const BG_COLOR: Color = Color::rgba(0.218, 0.554, 0.777, 0.1);
+const BG_COLOR: Color = Color::rgb(0.218, 0.554, 0.777);
 const BASE_BRICK_SCORE: f32 = 10.;
 const SCORE_MULTIPLIER_TIMEOUT: f32 = 1.;
 const SCORE_MULTIPLIER: f32 = 50.;
@@ -119,6 +119,7 @@ fn main() {
             Duration::from_secs_f32(SCORE_MULTIPLIER_TIMEOUT),
             TimerMode::Once,
         )))
+        .insert_resource(BackgroundAnimationDirection(true))
         .insert_resource(ClearColor(BG_COLOR))
         //
         // Plugins
@@ -150,6 +151,7 @@ fn main() {
             SystemSet::on_update(GameState::Playing)
                 .with_system(increase_ball_speed)
                 .with_system(on_ball_loss)
+                .with_system(animate_background)
                 .with_system(next_level)
                 .with_system(update_score)
                 .with_system(update_ball_count)
@@ -292,7 +294,7 @@ fn ball_collision_sounds(
                 audio.play_with_settings(
                     assets.audio.drop_003.clone(),
                     PlaybackSettings {
-                        volume: 0.5,
+                        volume: 0.3,
                         ..default()
                     },
                 );
