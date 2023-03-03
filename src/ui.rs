@@ -1,5 +1,7 @@
 use crate::*;
 
+const UI_Z_VALUE: f32 = 100.;
+
 #[derive(Component)]
 pub struct ScoreText;
 
@@ -18,7 +20,21 @@ pub struct UiBall;
 #[derive(Component)]
 pub struct ScoreValueText;
 
+#[derive(Component)]
+pub struct Background;
+
 pub struct UiPlugin;
+
+pub fn spawn_background(mut commands: Commands, assets: Res<GameAssets>) {
+    commands.spawn((
+        SpriteBundle {
+            texture: assets.image.background.clone(),
+            transform: Transform::from_xyz(0., -1700., 0.),
+            ..default()
+        },
+        Background,
+    ));
+}
 
 impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
@@ -43,7 +59,7 @@ pub fn spawn_title_text(mut commands: Commands, asset_server: Res<AssetServer>) 
             .with_alignment(TextAlignment::CENTER),
             ..default()
         })
-        .insert(Transform::from_xyz(0., 120., 1.))
+        .insert(Transform::from_xyz(0., 120., UI_Z_VALUE))
         .insert(TitleText);
 }
 
@@ -76,7 +92,7 @@ pub fn spawn_game_over_text(mut commands: Commands, asset_server: Res<AssetServe
             },
         )
         .with_alignment(TextAlignment::CENTER),
-        transform: Transform::from_xyz(0., 0., 1.),
+        transform: Transform::from_xyz(0., 0., UI_Z_VALUE),
         ..default()
     });
 }
@@ -92,7 +108,7 @@ pub fn spawn_level_done_text(mut commands: Commands, asset_server: Res<AssetServ
             },
         )
         .with_alignment(TextAlignment::CENTER),
-        transform: Transform::from_xyz(0., 0., 1.),
+        transform: Transform::from_xyz(0., 0., UI_Z_VALUE),
         ..default()
     });
 }
@@ -115,7 +131,7 @@ pub fn spawn_level_text(mut commands: Commands, asset_server: Res<AssetServer>) 
                     color: Color::GOLD,
                 }),
             ]),
-            transform: Transform::from_xyz(-5. * BRICK_WIDTH, WIN_HEIGHT / 2. - 10., 1.),
+            transform: Transform::from_xyz(-5. * BRICK_WIDTH, WIN_HEIGHT / 2. - 10., UI_Z_VALUE),
             ..default()
         },
         LevelText,
@@ -134,7 +150,7 @@ pub fn spawn_score_text(mut commands: Commands, asset_server: Res<AssetServer>) 
                 },
             )])
             .with_alignment(TextAlignment::TOP_LEFT),
-            transform: Transform::from_xyz(-90., WIN_HEIGHT / 2. - 10., 1.),
+            transform: Transform::from_xyz(-90., WIN_HEIGHT / 2. - 10., UI_Z_VALUE),
             ..default()
         },
         ScoreText,
@@ -148,7 +164,7 @@ pub fn spawn_score_text(mut commands: Commands, asset_server: Res<AssetServer>) 
                 color: Color::GOLD,
             })])
             .with_alignment(TextAlignment::TOP_LEFT),
-            transform: Transform::from_xyz(65., WIN_HEIGHT / 2. - 10., 1.),
+            transform: Transform::from_xyz(65., WIN_HEIGHT / 2. - 10., UI_Z_VALUE),
             ..default()
         },
         ScoreText,
@@ -157,7 +173,7 @@ pub fn spawn_score_text(mut commands: Commands, asset_server: Res<AssetServer>) 
 }
 
 pub fn update_score_text(
-    mut query: Query<&mut Text, With<ScoreValueText>>,
+    mut query: Query<(&mut Text, &mut Transform), With<ScoreValueText>>,
     player_progress: Res<PlayerProgress>,
     mut timer: ResMut<ScoreAnimationTimer>,
     mut score_increment_events: EventReader<ScoreIncrementEvent>,
@@ -182,13 +198,13 @@ pub fn update_score_text(
         }
     }
 
-    for mut text in &mut query {
+    for (mut text, mut transform) in &mut query {
         if player_progress.is_changed() {
             text.sections[0].value = player_progress.score.round().to_string();
         }
 
         if boost > 0. {
-            text.sections[0].style.font_size = 60. + boost * 40.;
+            transform.scale = Vec3::splat(1. + 0.8 * boost);
         }
     }
 }
@@ -210,13 +226,13 @@ pub fn spawn_ball_count(
     assets: Res<GameAssets>,
     player_progress: Res<PlayerProgress>,
 ) {
-    for i in 0..player_progress.balls_remaining {
+    for i in 0..player_progress.extra_balls_remaining {
         let x = 5. * BRICK_WIDTH - i as f32 * 40. - BALL_SIZE / 2.;
 
         commands
             .spawn(SpriteBundle {
                 texture: assets.image.ball.clone(),
-                transform: Transform::from_xyz(x, WIN_HEIGHT / 2. - 40., 0.),
+                transform: Transform::from_xyz(x, WIN_HEIGHT / 2. - 40., UI_Z_VALUE),
                 ..default()
             })
             .insert(UiBall);

@@ -47,6 +47,7 @@ pub struct PlayerProgress {
     score: f32,
     extra_balls_remaining: u8,
     level: u16,
+    bonus_score: f32,
 }
 
 impl Default for PlayerProgress {
@@ -55,6 +56,7 @@ impl Default for PlayerProgress {
             score: 0.,
             extra_balls_remaining: EXTRA_BALL_COUNT,
             level: 1,
+            bonus_score: 0.,
         }
     }
 }
@@ -215,8 +217,8 @@ fn reset_player_progress(mut player_progress: ResMut<PlayerProgress>) {
 }
 
 fn spawn_bricks(mut commands: Commands, assets: Res<GameAssets>) {
-    for x in 0..1 {
-        for y in 0..1 {
+    for x in 0..10 {
+        for y in 0..6 {
             let brick_sprites = [
                 &assets.image.brick_red,
                 &assets.image.brick_orange,
@@ -233,7 +235,7 @@ fn spawn_bricks(mut commands: Commands, assets: Res<GameAssets>) {
                     transform: Transform::from_xyz(
                         x as f32 * BRICK_WIDTH - 4.5 * BRICK_WIDTH,
                         WIN_HEIGHT / 2. - y as f32 * BRICK_HEIGHT - 100.,
-                        0.,
+                        10.,
                     ),
                     ..default()
                 })
@@ -252,7 +254,7 @@ fn spawn_paddle(mut commands: Commands, assets: Res<GameAssets>) {
     commands
         .spawn(Paddle { speed: 0. })
         .insert(SpriteBundle {
-            transform: Transform::from_xyz(0., -280., 0.),
+            transform: Transform::from_xyz(0., -280., 10.),
             texture: assets.image.paddle.clone(),
             ..default()
         })
@@ -315,6 +317,7 @@ fn update_score(
             if !timer.0.finished() {
                 let bonus = (SCORE_MULTIPLIER_TIMEOUT - timer.0.elapsed_secs()) * SCORE_MULTIPLIER;
                 score_increment += bonus;
+                player_progress.bonus_score += bonus;
             }
             score_events.send(ScoreIncrementEvent(score_increment));
             player_progress.score += score_increment;

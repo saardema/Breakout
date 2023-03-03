@@ -169,7 +169,7 @@ impl Command for SpawnBallCommand {
                 },
                 SpriteBundle {
                     texture: assets.image.ball.clone(),
-                    transform: Transform::from_xyz(0., 0., 0.),
+                    transform: Transform::from_xyz(0., 0., 10.),
                     ..default()
                 },
                 Collider {
