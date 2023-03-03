@@ -29,6 +29,9 @@ pub struct UiPlugin;
 #[derive(Resource)]
 pub struct BackgroundAnimationDirection(pub bool);
 
+#[derive(Resource)]
+pub struct ScoreAnimationTimer(Timer);
+
 pub fn spawn_background(mut commands: Commands, assets: Res<GameAssets>) {
     commands.spawn((
         SpriteBundle {
@@ -129,7 +132,7 @@ pub fn spawn_game_over_text(mut commands: Commands, asset_server: Res<AssetServe
     });
 }
 
-pub fn spawn_level_done_text(mut commands: Commands, asset_server: Res<AssetServer>) {
+pub fn spawn_level_complete_text(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn(Text2dBundle {
         text: Text::from_section(
             "Level complete",
@@ -143,6 +146,37 @@ pub fn spawn_level_done_text(mut commands: Commands, asset_server: Res<AssetServ
         transform: Transform::from_xyz(0., 0., UI_Z_VALUE),
         ..default()
     });
+}
+pub fn spawn_bonus_score_text(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    player_progress: Res<PlayerProgress>,
+) {
+    commands.spawn(
+        (Text2dBundle {
+            text: Text::from_sections([
+                TextSection::new(
+                    "Bonus: ",
+                    TextStyle {
+                        font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                        font_size: 60.0,
+                        color: Color::WHITE,
+                    },
+                ),
+                TextSection::new(
+                    player_progress.bonus_score.to_string(),
+                    TextStyle {
+                        font: asset_server.load("fonts/FiraMono-Medium.ttf"),
+                        font_size: 60.0,
+                        color: Color::GOLD,
+                    },
+                ),
+            ])
+            .with_alignment(TextAlignment::CENTER),
+            transform: Transform::from_xyz(0., -50., UI_Z_VALUE),
+            ..default()
+        }),
+    );
 }
 
 pub fn spawn_level_text(mut commands: Commands, asset_server: Res<AssetServer>) {
@@ -221,11 +255,11 @@ pub fn update_score_text(
         boost *= boost;
     }
 
-    for increment in score_increment_events.iter() {
-        if increment.0 > 10. {
+    for score_increment in score_increment_events.iter() {
+        if score_increment.0 > 10. {
             timer.0.reset();
             timer.0.set_duration(Duration::from_secs_f32(
-                SCORE_ANIM_MAX_DURATION * increment.0.min(70.) / 70.,
+                SCORE_ANIM_MAX_DURATION * score_increment.0.min(70.) / 70.,
             ));
         }
     }
@@ -240,9 +274,6 @@ pub fn update_score_text(
         }
     }
 }
-
-#[derive(Resource)]
-pub struct ScoreAnimationTimer(Timer);
 
 pub fn update_level_text(
     mut query: Query<&mut Text, With<LevelText>>,

@@ -18,6 +18,7 @@ const SCORE_MULTIPLIER_TIMEOUT: f32 = 1.;
 const SCORE_MULTIPLIER: f32 = 50.;
 const SCORE_ANIM_MAX_DURATION: f32 = 0.6;
 const EXTRA_BALL_COUNT: u8 = 3;
+const BALLS_SPEED_TIME_INCREMENT: f32 = 2.;
 
 mod assets;
 mod ball;
@@ -78,121 +79,125 @@ pub struct GamePauseEvent {
 struct ScoreIncrementTimer(pub Timer);
 
 #[derive(Resource)]
-pub struct TransitionTimer(pub Timer);
+pub struct StateTransitionTimer(pub Timer);
 
 fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            window: WindowDescriptor {
-                title: "Breakout!".to_string(),
-                width: WIN_WIDTH,
-                height: WIN_HEIGHT,
-                resizable: false,
-                monitor: if cfg!(debug_assertions) {
-                    MonitorSelection::Index(0)
-                } else {
-                    MonitorSelection::Current
-                },
-                ..default()
+    let mut app = App::new();
+
+    // Plugins
+    app.add_plugins(DefaultPlugins.set(WindowPlugin {
+        window: WindowDescriptor {
+            title: "Breakout!".to_string(),
+            width: WIN_WIDTH,
+            height: WIN_HEIGHT,
+            resizable: false,
+            monitor: if cfg!(debug_assertions) {
+                MonitorSelection::Index(0)
+            } else {
+                MonitorSelection::Current
             },
             ..default()
-        }))
-        //
-        // Events
-        .add_event::<GamePauseEvent>()
-        .add_event::<ScoreIncrementEvent>()
-        //
-        // State independent systems
-        .add_startup_system(spawn_background)
+        },
+        ..default()
+    }));
+
+    // Events
+    app.add_event::<GamePauseEvent>()
+        .add_event::<ScoreIncrementEvent>();
+
+    // State independent systems
+    app.add_startup_system(spawn_background)
         .add_startup_system(spawn_camera)
         .add_system(on_window_focus)
         .add_system(on_pause)
-        .add_system_to_stage(CoreStage::Last, ball_collision_sounds)
-        //
-        // Resources
-        .insert_resource(PlayerProgress::default())
-        .insert_resource(TransitionTimer(Timer::new(
+        .add_system_to_stage(CoreStage::Last, ball_collision_sounds);
+
+    // Resources
+    app.insert_resource(PlayerProgress::default())
+        .insert_resource(StateTransitionTimer(Timer::new(
             Duration::from_secs(2),
             TimerMode::Once,
         )))
         .insert_resource(ScoreIncrementTimer(Timer::new(
-            Duration::from_secs_f32(SCORE_MULTIPLIER_TIMEOUT),
+            Duration::from_secs_f32(0.),
             TimerMode::Once,
         )))
         .insert_resource(BackgroundAnimationDirection(true))
-        .insert_resource(ClearColor(BG_COLOR))
-        //
-        // Plugins
-        .add_plugin(UiPlugin)
+        .insert_resource(ClearColor(BG_COLOR));
+
+    // Plugins
+    app.add_plugin(UiPlugin)
         .add_plugin(BallPlugin)
         .add_plugin(GameInputPlugin)
-        .add_plugin(GameAssetsPlugin)
-        .add_state(GameState::Start)
-        //
-        // Start state
-        .add_system_set(
-            SystemSet::on_enter(GameState::Start)
-                .with_system(spawn_play_text)
-                .with_system(spawn_title_text),
-        )
-        .add_system_set(SystemSet::on_exit(GameState::Start).with_system(despawn::<Text>))
-        //
-        // Playing state
-        .add_system_set(
-            SystemSet::on_enter(GameState::Playing)
-                .with_system(spawn_ball_count)
-                .with_system(spawn_bricks)
-                .with_system(spawn_paddle)
-                .with_system(spawn_level_text.before(spawn_score_text))
-                .with_system(spawn_score_text)
-                .with_system(spawn_ball),
-        )
-        .add_system_set(
-            SystemSet::on_update(GameState::Playing)
-                .with_system(increase_ball_speed)
-                .with_system(on_ball_loss)
-                .with_system(animate_background)
-                .with_system(next_level)
-                .with_system(update_score)
-                .with_system(update_ball_count)
-                .with_system(update_level_text)
-                .with_system(update_score_text),
-        )
-        .add_system_set(
-            SystemSet::on_exit(GameState::Playing)
-                .with_system(despawn::<Ball>)
-                .with_system(despawn::<UiBall>)
-                .with_system(despawn::<Paddle>)
-                .with_system(despawn::<Text>)
-                .with_system(despawn::<Brick>),
-        )
-        //
-        // Paused state
-        .add_system_set(SystemSet::on_enter(GameState::Paused).with_system(spawn_play_text))
-        .add_system_set(SystemSet::on_exit(GameState::Paused).with_system(despawn::<PlayText>))
-        //
-        // GameOver state
-        .add_system_set(SystemSet::on_enter(GameState::GameOver).with_system(spawn_game_over_text))
+        .add_plugin(GameAssetsPlugin);
+
+    app.add_state(GameState::Start);
+
+    // Start state
+    app.add_system_set(
+        SystemSet::on_enter(GameState::Start)
+            .with_system(spawn_play_text)
+            .with_system(spawn_title_text),
+    )
+    .add_system_set(SystemSet::on_exit(GameState::Start).with_system(despawn::<Text>));
+
+    // Playing state
+    app.add_system_set(
+        SystemSet::on_enter(GameState::Playing)
+            .with_system(spawn_ball_count)
+            .with_system(spawn_bricks)
+            .with_system(spawn_paddle)
+            .with_system(spawn_level_text.before(spawn_score_text))
+            .with_system(spawn_score_text)
+            .with_system(spawn_ball),
+    )
+    .add_system_set(
+        SystemSet::on_update(GameState::Playing)
+            .with_system(increase_ball_speed)
+            .with_system(on_ball_loss)
+            .with_system(animate_background)
+            .with_system(next_level)
+            .with_system(update_score)
+            .with_system(update_ball_count)
+            .with_system(update_level_text)
+            .with_system(update_score_text),
+    )
+    .add_system_set(
+        SystemSet::on_exit(GameState::Playing)
+            .with_system(despawn::<Ball>)
+            .with_system(despawn::<UiBall>)
+            .with_system(despawn::<Paddle>)
+            .with_system(despawn::<Text>)
+            .with_system(despawn::<Brick>),
+    );
+
+    // Paused state
+    app.add_system_set(SystemSet::on_enter(GameState::Paused).with_system(spawn_play_text))
+        .add_system_set(SystemSet::on_exit(GameState::Paused).with_system(despawn::<PlayText>));
+
+    // Level transition state
+    app.add_system_set(
+        SystemSet::on_enter(GameState::LevelCompleted)
+            .with_system(spawn_level_complete_text)
+            .with_system(spawn_bonus_score_text),
+    )
+    .add_system_set(SystemSet::on_update(GameState::LevelCompleted).with_system(transition_timer))
+    .add_system_set(SystemSet::on_exit(GameState::LevelCompleted).with_system(despawn::<Text>));
+
+    // GameOver state
+    app.add_system_set(SystemSet::on_enter(GameState::GameOver).with_system(spawn_game_over_text))
         .add_system_set(SystemSet::on_update(GameState::GameOver).with_system(transition_timer))
         .add_system_set(
             SystemSet::on_exit(GameState::GameOver)
                 .with_system(despawn::<Text>)
                 .with_system(reset_player_progress),
-        )
-        //
-        // Level transition state
-        .add_system_set(
-            SystemSet::on_enter(GameState::LevelCompleted).with_system(spawn_level_done_text),
-        )
-        .add_system_set(
-            SystemSet::on_update(GameState::LevelCompleted).with_system(transition_timer),
-        )
-        .add_system_set(SystemSet::on_exit(GameState::LevelCompleted).with_system(despawn::<Text>))
-        .run();
+        );
+
+    app.run();
 }
 
 fn transition_timer(
-    mut timer: ResMut<TransitionTimer>,
+    mut timer: ResMut<StateTransitionTimer>,
     mut state: ResMut<State<GameState>>,
     time: Res<Time>,
 ) {
@@ -210,7 +215,7 @@ fn transition_timer(
 
 fn increase_ball_speed(mut query: Query<&mut Ball>, time: Res<Time>) {
     for mut ball in query.iter_mut() {
-        ball.speed += time.delta_seconds() * 4.;
+        ball.speed += time.delta_seconds() * BALLS_SPEED_TIME_INCREMENT;
     }
 }
 
