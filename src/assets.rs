@@ -11,6 +11,7 @@ pub struct AudioHandles {
     pub drop_002: Handle<AudioSource>,
     pub drop_003: Handle<AudioSource>,
     pub drop_004: Handle<AudioSource>,
+    pub music_01: Handle<AudioSource>,
 }
 pub struct ImageHandles {
     pub ball: Handle<Image>,
@@ -36,6 +37,7 @@ fn asset_loading(mut commands: Commands, assets: Res<AssetServer>) {
             drop_002: assets.load("sound/drop_002.ogg"),
             drop_003: assets.load("sound/drop_003.ogg"),
             drop_004: assets.load("sound/drop_004.ogg"),
+            music_01: assets.load("sound/music_01.mp3"),
         },
         image: ImageHandles {
             ball: assets.load("images/ball.png"),

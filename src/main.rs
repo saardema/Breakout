@@ -196,6 +196,17 @@ fn main() {
     app.run();
 }
 
+fn play_music(assets: Res<GameAssets>, audio: Res<Audio>) {
+    audio.play_with_settings(
+        assets.audio.music_01.clone(),
+        PlaybackSettings {
+            repeat: true,
+            volume: 0.5,
+            speed: 1.,
+        },
+    );
+}
+
 fn transition_timer(
     mut timer: ResMut<StateTransitionTimer>,
     mut state: ResMut<State<GameState>>,
