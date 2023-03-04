@@ -4,11 +4,23 @@ use crate::*;
 
 pub const BALL_SIZE: f32 = 22.;
 
-#[derive(Component, Default)]
+#[derive(Component)]
 pub struct Ball {
     pub direction: Vec2,
     pub speed: f32,
     pub curve: f32,
+    pub ball_type: BallType,
+}
+
+#[derive(PartialEq)]
+pub enum BallType {
+    Regular,
+    FireBall,
+}
+
+#[derive(Component)]
+pub struct FireBall {
+    pub age: f32,
 }
 
 pub struct BallCollisionEvent(pub BallCollisionType);
@@ -17,10 +29,10 @@ pub struct BallCollisionEvent(pub BallCollisionType);
 pub enum BallCollisionType {
     Wall,
     Paddle,
-    Brick,
 }
 
-pub struct BallLossEvent;
+pub struct AllBallsLostEvent;
+
 pub struct BallPlugin;
 
 impl Plugin for BallPlugin {
@@ -32,7 +44,7 @@ impl Plugin for BallPlugin {
                 .with_system(ball_loss),
         )
         .add_event::<BallCollisionEvent>()
-        .add_event::<BallLossEvent>();
+        .add_event::<AllBallsLostEvent>();
     }
 }
 
@@ -66,19 +78,23 @@ fn ball_movement(
 
 fn ball_loss(
     mut commands: Commands,
-    mut ball_loss_event: EventWriter<BallLossEvent>,
+    mut ball_loss_event: EventWriter<AllBallsLostEvent>,
     mut ball_query: Query<(Entity, &mut Transform), With<Ball>>,
 ) {
     for (entity, ball_transform) in ball_query.iter_mut() {
         if ball_transform.translation.y < -WIN_HEIGHT / 2. {
             commands.entity(entity).despawn();
-            ball_loss_event.send(BallLossEvent);
         }
+    }
+
+    if ball_query.is_empty() {
+        ball_loss_event.send(AllBallsLostEvent);
     }
 }
 
 fn check_collisions(
     mut commands: Commands,
+    mut brick_events: EventWriter<BrickDesctructionEvent>,
     mut collision_events: EventWriter<BallCollisionEvent>,
     mut ball_query: Query<(&mut Ball, &Collider, &mut Transform), Without<AttachedToPaddle>>,
     mut collider_query: Query<
@@ -99,6 +115,14 @@ fn check_collisions(
 
         if collision.is_some() {
             collision_events.send(BallCollisionEvent(BallCollisionType::Wall));
+
+            match collision {
+                Some(Collision::Left) => ball.direction.x = -ball.direction.x.abs(),
+                Some(Collision::Right) => ball.direction.x = ball.direction.x.abs(),
+                Some(Collision::Top) => ball.direction.y = ball.direction.y.abs(),
+                Some(Collision::Bottom) => ball.direction.y = -ball.direction.y.abs(),
+                _ => {}
+            }
         } else {
             for (entity, other_collider, other_transform, brick, paddle) in
                 collider_query.iter_mut()
@@ -111,11 +135,15 @@ fn check_collisions(
                 );
 
                 if collision.is_some() {
-                    if brick.is_some() {
+                    if let Some(brick) = brick {
                         if !bricks_to_despawn.contains(&entity) {
                             bricks_to_despawn.push(entity);
                         }
-                        collision_events.send(BallCollisionEvent(BallCollisionType::Brick));
+
+                        brick_events.send(BrickDesctructionEvent {
+                            position: other_transform.translation,
+                            brick_type: brick.brick_type.clone(),
+                        });
                     } else if let Some(paddle) = paddle {
                         // Reflection based on paddle hit point
                         let delta = ball_transform.translation.x - other_transform.translation.x;
@@ -131,22 +159,24 @@ fn check_collisions(
                         collision_events.send(BallCollisionEvent(BallCollisionType::Paddle));
                     }
 
+                    if ball.ball_type != BallType::FireBall {
+                        match collision {
+                            Some(Collision::Left) => ball.direction.x = -ball.direction.x.abs(),
+                            Some(Collision::Right) => ball.direction.x = ball.direction.x.abs(),
+                            Some(Collision::Top) => ball.direction.y = ball.direction.y.abs(),
+                            Some(Collision::Bottom) => ball.direction.y = -ball.direction.y.abs(),
+                            _ => {}
+                        }
+                    }
+
                     break;
                 }
             }
         }
-
-        match collision {
-            Some(Collision::Left) => ball.direction.x = -ball.direction.x.abs(),
-            Some(Collision::Right) => ball.direction.x = ball.direction.x.abs(),
-            Some(Collision::Top) => ball.direction.y = ball.direction.y.abs(),
-            Some(Collision::Bottom) => ball.direction.y = -ball.direction.y.abs(),
-            _ => {}
-        }
     }
 
     for entity in bricks_to_despawn.iter() {
-        commands.entity(*entity).despawn();
+        commands.entity(*entity).despawn_recursive();
     }
 }
 
@@ -164,8 +194,9 @@ impl Command for SpawnBallCommand {
             world.spawn((
                 Ball {
                     direction: Vec2::new(rand::random::<f32>() * 2. - 1., 1.),
-                    speed: 400. + progress.unwrap().level as f32 * 50.,
+                    speed: 300. + progress.unwrap().level as f32 * 50.,
                     curve: 0.,
+                    ball_type: BallType::Regular,
                 },
                 SpriteBundle {
                     texture: assets.image.ball.clone(),

@@ -40,12 +40,12 @@ pub fn spawn_background(mut commands: Commands, assets: Res<GameAssets>) {
                     red: 0.2,
                     green: 0.5,
                     blue: 0.7,
-                    alpha: 0.8,
+                    alpha: 0.9,
                 },
                 ..default()
             },
             texture: assets.image.background.clone(),
-            transform: Transform::from_xyz(1000., 1000., 0.),
+            transform: Transform::from_xyz(1000., -1000., 0.),
             ..default()
         },
         Background,
@@ -152,31 +152,29 @@ pub fn spawn_bonus_score_text(
     asset_server: Res<AssetServer>,
     player_progress: Res<PlayerProgress>,
 ) {
-    commands.spawn(
-        (Text2dBundle {
-            text: Text::from_sections([
-                TextSection::new(
-                    "Bonus: ",
-                    TextStyle {
-                        font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                        font_size: 60.0,
-                        color: Color::WHITE,
-                    },
-                ),
-                TextSection::new(
-                    player_progress.bonus_score.to_string(),
-                    TextStyle {
-                        font: asset_server.load("fonts/FiraMono-Medium.ttf"),
-                        font_size: 60.0,
-                        color: Color::GOLD,
-                    },
-                ),
-            ])
-            .with_alignment(TextAlignment::CENTER),
-            transform: Transform::from_xyz(0., -50., UI_Z_VALUE),
-            ..default()
-        }),
-    );
+    commands.spawn(Text2dBundle {
+        text: Text::from_sections([
+            TextSection::new(
+                "Bonus: ",
+                TextStyle {
+                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                    font_size: 60.0,
+                    color: Color::WHITE,
+                },
+            ),
+            TextSection::new(
+                player_progress.bonus_score.round().to_string(),
+                TextStyle {
+                    font: asset_server.load("fonts/FiraMono-Medium.ttf"),
+                    font_size: 60.0,
+                    color: Color::GOLD,
+                },
+            ),
+        ])
+        .with_alignment(TextAlignment::CENTER),
+        transform: Transform::from_xyz(0., -80., UI_Z_VALUE),
+        ..default()
+    });
 }
 
 pub fn spawn_level_text(mut commands: Commands, asset_server: Res<AssetServer>) {

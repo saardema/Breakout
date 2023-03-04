@@ -19,6 +19,10 @@ const SCORE_MULTIPLIER: f32 = 50.;
 const SCORE_ANIM_MAX_DURATION: f32 = 0.6;
 const EXTRA_BALL_COUNT: u8 = 3;
 const BALLS_SPEED_TIME_INCREMENT: f32 = 2.;
+const BRICK_COLUMNS: usize = 10;
+const BRICK_ROWS: usize = 6;
+const FIREBALL_CHANCE: f32 = 0.04;
+const MAX_FIREBALL_AGE: f32 = 4.;
 
 mod assets;
 mod ball;
@@ -28,7 +32,9 @@ mod ui;
 pub struct ScoreIncrementEvent(f32);
 
 #[derive(Component)]
-pub struct Brick;
+pub struct Brick {
+    brick_type: BrickType,
+}
 
 #[derive(Component)]
 pub struct Paddle {
@@ -42,6 +48,17 @@ pub struct Collider {
 
 #[derive(Component)]
 pub struct AttachedToPaddle;
+
+#[derive(PartialEq, Clone)]
+pub enum BrickType {
+    Regular,
+    Fireball,
+}
+
+pub struct BrickDesctructionEvent {
+    position: Vec3,
+    brick_type: BrickType,
+}
 
 #[derive(Resource)]
 pub struct PlayerProgress {
@@ -103,6 +120,7 @@ fn main() {
 
     // Events
     app.add_event::<GamePauseEvent>()
+        .add_event::<BrickDesctructionEvent>()
         .add_event::<ScoreIncrementEvent>();
 
     // State independent systems
@@ -110,7 +128,7 @@ fn main() {
         .add_startup_system(spawn_camera)
         .add_system(on_window_focus)
         .add_system(on_pause)
-        .add_system_to_stage(CoreStage::Last, ball_collision_sounds);
+        .add_system_to_stage(CoreStage::Last, play_sounds);
 
     // Resources
     app.insert_resource(PlayerProgress::default())
@@ -119,7 +137,7 @@ fn main() {
             TimerMode::Once,
         )))
         .insert_resource(ScoreIncrementTimer(Timer::new(
-            Duration::from_secs_f32(0.),
+            Duration::from_secs_f32(1.),
             TimerMode::Once,
         )))
         .insert_resource(BackgroundAnimationDirection(true))
@@ -136,6 +154,7 @@ fn main() {
     // Start state
     app.add_system_set(
         SystemSet::on_enter(GameState::Start)
+            .with_system(play_music)
             .with_system(spawn_play_text)
             .with_system(spawn_title_text),
     )
@@ -144,6 +163,7 @@ fn main() {
     // Playing state
     app.add_system_set(
         SystemSet::on_enter(GameState::Playing)
+            .with_system(reset_bonus_score)
             .with_system(spawn_ball_count)
             .with_system(spawn_bricks)
             .with_system(spawn_paddle)
@@ -154,9 +174,11 @@ fn main() {
     .add_system_set(
         SystemSet::on_update(GameState::Playing)
             .with_system(increase_ball_speed)
-            .with_system(on_ball_loss)
+            .with_system(on_all_balls_lost)
             .with_system(animate_background)
             .with_system(next_level)
+            .with_system(expire_fireballs)
+            .with_system(handle_brick_destruction)
             .with_system(update_score)
             .with_system(update_ball_count)
             .with_system(update_level_text)
@@ -207,6 +229,10 @@ fn play_music(assets: Res<GameAssets>, audio: Res<Audio>) {
     );
 }
 
+fn reset_bonus_score(mut progress: ResMut<PlayerProgress>) {
+    progress.bonus_score = 0.;
+}
+
 fn transition_timer(
     mut timer: ResMut<StateTransitionTimer>,
     mut state: ResMut<State<GameState>>,
@@ -234,9 +260,12 @@ fn reset_player_progress(mut player_progress: ResMut<PlayerProgress>) {
     *player_progress = PlayerProgress::default();
 }
 
+#[derive(Component)]
+struct HasFireBall;
+
 fn spawn_bricks(mut commands: Commands, assets: Res<GameAssets>) {
-    for x in 0..10 {
-        for y in 0..6 {
+    for x in 0..BRICK_COLUMNS {
+        for y in 0..BRICK_ROWS {
             let brick_sprites = [
                 &assets.image.brick_red,
                 &assets.image.brick_orange,
@@ -246,9 +275,11 @@ fn spawn_bricks(mut commands: Commands, assets: Res<GameAssets>) {
                 &assets.image.brick_blue,
             ];
 
-            commands
-                .spawn(Brick)
-                .insert(SpriteBundle {
+            let mut bundle = (
+                Brick {
+                    brick_type: BrickType::Regular,
+                },
+                SpriteBundle {
                     texture: brick_sprites[y].clone(),
                     transform: Transform::from_xyz(
                         x as f32 * BRICK_WIDTH - 4.5 * BRICK_WIDTH,
@@ -256,10 +287,27 @@ fn spawn_bricks(mut commands: Commands, assets: Res<GameAssets>) {
                         10.,
                     ),
                     ..default()
-                })
-                .insert(Collider {
+                },
+                Collider {
                     size: Vec2::new(BRICK_WIDTH, BRICK_HEIGHT),
-                });
+                },
+            );
+
+            if rand::random::<f32>() < FIREBALL_CHANCE {
+                bundle.0.brick_type = BrickType::Fireball;
+                let parent = commands.spawn(bundle).id();
+                let child = commands
+                    .spawn(SpriteBundle {
+                        texture: assets.image.ball_fire.clone(),
+                        transform: Transform::from_xyz(0., 0., 10.),
+                        ..default()
+                    })
+                    .id();
+
+                commands.entity(parent).push_children(&[child]);
+            } else {
+                commands.spawn(bundle);
+            }
         }
     }
 }
@@ -293,16 +341,25 @@ fn get_wall_collision_direction(position: Vec3) -> Option<Collision> {
     }
 }
 
-fn ball_collision_sounds(
-    mut events: EventReader<BallCollisionEvent>,
+fn play_sounds(
+    mut collision_events: EventReader<BallCollisionEvent>,
+    mut brick_destruction_events: EventReader<BrickDesctructionEvent>,
     audio: Res<Audio>,
     assets: Res<GameAssets>,
 ) {
-    for event in events.iter() {
+    for _ in brick_destruction_events.iter() {
+        audio.play_with_settings(
+            assets.audio.drop_004.clone(),
+            PlaybackSettings {
+                repeat: false,
+                volume: 1.,
+                speed: rand::random::<f32>() * 0.4 + 0.8,
+            },
+        );
+    }
+
+    for event in collision_events.iter() {
         match event.0 {
-            BallCollisionType::Brick => {
-                audio.play(assets.audio.drop_004.clone());
-            }
             BallCollisionType::Paddle => {
                 audio.play(assets.audio.drop_002.clone());
             }
@@ -320,7 +377,7 @@ fn ball_collision_sounds(
 }
 
 fn update_score(
-    mut collision_events: EventReader<BallCollisionEvent>,
+    mut destruction_events: EventReader<BrickDesctructionEvent>,
     mut score_events: EventWriter<ScoreIncrementEvent>,
     mut player_progress: ResMut<PlayerProgress>,
     mut timer: ResMut<ScoreIncrementTimer>,
@@ -328,25 +385,23 @@ fn update_score(
 ) {
     timer.0.tick(time.delta());
 
-    for event in collision_events.iter() {
-        if event.0 == BallCollisionType::Brick {
-            let mut score_increment = BASE_BRICK_SCORE;
+    for _ in destruction_events.iter() {
+        let mut score_increment = BASE_BRICK_SCORE;
 
-            if !timer.0.finished() {
-                let bonus = (SCORE_MULTIPLIER_TIMEOUT - timer.0.elapsed_secs()) * SCORE_MULTIPLIER;
-                score_increment += bonus;
-                player_progress.bonus_score += bonus;
-            }
-            score_events.send(ScoreIncrementEvent(score_increment));
-            player_progress.score += score_increment;
-            timer.0.reset();
+        if !timer.0.finished() {
+            let bonus = (SCORE_MULTIPLIER_TIMEOUT - timer.0.elapsed_secs()) * SCORE_MULTIPLIER;
+            score_increment += bonus;
+            player_progress.bonus_score += bonus;
         }
+        score_events.send(ScoreIncrementEvent(score_increment));
+        player_progress.score += score_increment;
+        timer.0.reset();
     }
 }
 
-fn on_ball_loss(
+fn on_all_balls_lost(
     mut commands: Commands,
-    mut ball_loss_events: EventReader<BallLossEvent>,
+    mut ball_loss_events: EventReader<AllBallsLostEvent>,
     mut player_progress: ResMut<PlayerProgress>,
     mut state: ResMut<State<GameState>>,
 ) {
@@ -397,6 +452,48 @@ fn on_pause(mut pause_event: EventReader<GamePauseEvent>, mut state: ResMut<Stat
             } else if !e.should_pause && state.current() == &GameState::Paused {
                 state.overwrite_pop().unwrap();
             }
+        }
+    }
+}
+
+fn handle_brick_destruction(
+    mut commands: Commands,
+    mut events: EventReader<BrickDesctructionEvent>,
+    assets: Res<GameAssets>,
+) {
+    for event in events.iter() {
+        if event.brick_type == BrickType::Fireball {
+            commands.spawn((
+                Ball {
+                    direction: Vec2::new(rand::random::<f32>(), rand::random::<f32>()),
+                    speed: 400.,
+                    curve: 0.,
+                    ball_type: BallType::FireBall,
+                },
+                SpriteBundle {
+                    texture: assets.image.ball_fire.clone(),
+                    transform: Transform::from_translation(event.position),
+                    ..default()
+                },
+                Collider {
+                    size: Vec2::splat(BALL_SIZE),
+                },
+                FireBall { age: 0. },
+            ));
+        }
+    }
+}
+
+fn expire_fireballs(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut query: Query<(Entity, &mut FireBall)>,
+) {
+    for (entity, mut fireball) in query.iter_mut() {
+        fireball.age += time.delta_seconds();
+
+        if fireball.age > MAX_FIREBALL_AGE {
+            commands.entity(entity).despawn();
         }
     }
 }

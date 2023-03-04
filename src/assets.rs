@@ -15,6 +15,7 @@ pub struct AudioHandles {
 }
 pub struct ImageHandles {
     pub ball: Handle<Image>,
+    pub ball_fire: Handle<Image>,
     pub paddle: Handle<Image>,
     pub brick_blue: Handle<Image>,
     pub brick_green: Handle<Image>,
@@ -41,6 +42,7 @@ fn asset_loading(mut commands: Commands, assets: Res<AssetServer>) {
         },
         image: ImageHandles {
             ball: assets.load("images/ball.png"),
+            ball_fire: assets.load("images/ball_fire.png"),
             paddle: assets.load("images/paddle.png"),
             brick_blue: assets.load("images/brick_blue.png"),
             brick_green: assets.load("images/brick_green.png"),
