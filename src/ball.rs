@@ -4,13 +4,9 @@ use crate::*;
 
 pub const BALL_SIZE: f32 = 22.;
 
-#[derive(Component)]
-pub struct Ball {
-    pub direction: Vec2,
-    pub speed: f32,
-    pub curve: f32,
-    pub ball_type: BallType,
-}
+pub struct AllBallsLostEvent;
+
+pub struct BallCollisionEvent(pub BallCollisionType);
 
 #[derive(PartialEq)]
 pub enum BallType {
@@ -19,11 +15,17 @@ pub enum BallType {
 }
 
 #[derive(Component)]
+pub struct Ball {
+    pub direction: Vec2,
+    pub speed: f32,
+    pub curve: f32,
+    pub ball_type: BallType,
+}
+
+#[derive(Component)]
 pub struct FireBall {
     pub age: f32,
 }
-
-pub struct BallCollisionEvent(pub BallCollisionType);
 
 #[derive(PartialEq)]
 pub enum BallCollisionType {
@@ -31,7 +33,8 @@ pub enum BallCollisionType {
     Paddle,
 }
 
-pub struct AllBallsLostEvent;
+#[derive(Component)]
+pub struct AttachedToPaddle;
 
 pub struct BallPlugin;
 
@@ -42,6 +45,8 @@ impl Plugin for BallPlugin {
                 .with_system(check_wall_collisions.before(ball_movement))
                 .with_system(check_collisions.before(ball_movement))
                 .with_system(ball_movement)
+                .with_system(increase_ball_speed)
+                .with_system(expire_fireballs)
                 .with_system(ball_loss),
         )
         .add_event::<BallCollisionEvent>()
@@ -212,5 +217,25 @@ impl Command for SpawnBallCommand {
                 AttachedToPaddle,
             ));
         }
+    }
+}
+
+fn expire_fireballs(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut query: Query<(Entity, &mut FireBall)>,
+) {
+    for (entity, mut fireball) in query.iter_mut() {
+        fireball.age += time.delta_seconds();
+
+        if fireball.age > MAX_FIREBALL_AGE {
+            commands.entity(entity).despawn();
+        }
+    }
+}
+
+fn increase_ball_speed(mut query: Query<&mut Ball>, time: Res<Time>) {
+    for mut ball in query.iter_mut() {
+        ball.speed += time.delta_seconds() * BALLS_SPEED_TIME_INCREMENT;
     }
 }

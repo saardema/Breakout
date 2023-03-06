@@ -29,6 +29,11 @@ mod ball;
 mod input;
 mod ui;
 
+pub struct BrickDesctructionEvent {
+    position: Vec3,
+    brick_type: BrickType,
+}
+
 pub struct ScoreIncrementEvent(f32);
 
 #[derive(Component)]
@@ -46,18 +51,10 @@ pub struct Collider {
     pub size: Vec2,
 }
 
-#[derive(Component)]
-pub struct AttachedToPaddle;
-
 #[derive(PartialEq, Clone)]
 pub enum BrickType {
     Regular,
     Fireball,
-}
-
-pub struct BrickDesctructionEvent {
-    position: Vec3,
-    brick_type: BrickType,
 }
 
 #[derive(Resource)]
@@ -143,14 +140,12 @@ fn main() {
             Duration::from_secs_f32(1.),
             TimerMode::Once,
         )))
-        .insert_resource(BackgroundAnimationDirection(true))
         .insert_resource(ClearColor(BG_COLOR));
 
     app.add_state(GameState::Start);
 
     // Start state
-    app.add_system_set(SystemSet::on_enter(GameState::Start).with_system(play_music))
-        .add_system_set(SystemSet::on_exit(GameState::Start).with_system(despawn::<Text>));
+    app.add_system_set(SystemSet::on_enter(GameState::Start).with_system(play_music));
 
     // Playing state
     app.add_system_set(
@@ -162,11 +157,9 @@ fn main() {
     )
     .add_system_set(
         SystemSet::on_update(GameState::Playing)
-            .with_system(increase_ball_speed)
             .with_system(on_all_balls_lost)
             .with_system(next_level)
-            .with_system(expire_fireballs)
-            .with_system(handle_brick_destruction)
+            .with_system(handle_powerups)
             .with_system(update_score),
     )
     .add_system_set(
@@ -221,18 +214,9 @@ fn transition_timer(
     }
 }
 
-fn increase_ball_speed(mut query: Query<&mut Ball>, time: Res<Time>) {
-    for mut ball in query.iter_mut() {
-        ball.speed += time.delta_seconds() * BALLS_SPEED_TIME_INCREMENT;
-    }
-}
-
 fn reset_player_progress(mut player_progress: ResMut<PlayerProgress>) {
     *player_progress = PlayerProgress::default();
 }
-
-#[derive(Component)]
-struct HasFireBall;
 
 fn spawn_bricks(mut commands: Commands, assets: Res<GameAssets>) {
     for x in 0..BRICK_COLUMNS {
@@ -414,7 +398,7 @@ fn on_pause(mut pause_event: EventReader<GamePauseEvent>, mut state: ResMut<Stat
     }
 }
 
-fn handle_brick_destruction(
+fn handle_powerups(
     mut commands: Commands,
     mut events: EventReader<BrickDesctructionEvent>,
     assets: Res<GameAssets>,
@@ -438,20 +422,6 @@ fn handle_brick_destruction(
                 },
                 FireBall { age: 0. },
             ));
-        }
-    }
-}
-
-fn expire_fireballs(
-    time: Res<Time>,
-    mut commands: Commands,
-    mut query: Query<(Entity, &mut FireBall)>,
-) {
-    for (entity, mut fireball) in query.iter_mut() {
-        fireball.age += time.delta_seconds();
-
-        if fireball.age > MAX_FIREBALL_AGE {
-            commands.entity(entity).despawn();
         }
     }
 }

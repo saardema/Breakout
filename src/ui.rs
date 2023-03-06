@@ -38,12 +38,18 @@ impl Plugin for UiPlugin {
             .insert_resource(ScoreAnimationTimer(Timer::new(
                 Duration::from_secs_f32(SCORE_ANIM_MAX_DURATION),
                 TimerMode::Once,
-            )))
-            .add_system_set(
-                SystemSet::on_enter(GameState::Start)
-                    .with_system(spawn_play_text)
-                    .with_system(spawn_title_text),
-            );
+            )));
+
+        // Resources
+        app.insert_resource(BackgroundAnimationDirection(true));
+
+        // Start state
+        app.add_system_set(
+            SystemSet::on_enter(GameState::Start)
+                .with_system(spawn_play_text)
+                .with_system(spawn_title_text),
+        )
+        .add_system_set(SystemSet::on_exit(GameState::Start).with_system(despawn::<Text>));
 
         // Playing state
         app.add_system_set(
@@ -65,6 +71,7 @@ impl Plugin for UiPlugin {
         app.add_system_set(SystemSet::on_enter(GameState::Paused).with_system(spawn_play_text))
             .add_system_set(SystemSet::on_exit(GameState::Paused).with_system(despawn::<PlayText>));
 
+        // Level completed state
         app.add_system_set(
             SystemSet::on_enter(GameState::LevelCompleted)
                 .with_system(spawn_level_complete_text)
@@ -72,6 +79,7 @@ impl Plugin for UiPlugin {
         )
         .add_system_set(SystemSet::on_exit(GameState::LevelCompleted).with_system(despawn::<Text>));
 
+        // Gameover state
         app.add_system_set(
             SystemSet::on_enter(GameState::GameOver).with_system(spawn_game_over_text),
         )
