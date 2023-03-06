@@ -288,7 +288,7 @@ pub fn spawn_ball_count(
     player_progress: Res<PlayerProgress>,
 ) {
     for i in 0..player_progress.extra_balls_remaining {
-        let x = 5. * BRICK_WIDTH - i as f32 * 40. - BALL_SIZE / 2.;
+        let x = 5. * BRICK_WIDTH - i as f32 * 30. - BALL_SIZE / 2.;
 
         commands
             .spawn(SpriteBundle {

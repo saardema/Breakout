@@ -328,19 +328,6 @@ fn spawn_paddle(mut commands: Commands, assets: Res<GameAssets>) {
             size: Vec2::new(PADDLE_WIDTH, PADDLE_HEIGHT),
         });
 }
-
-fn get_wall_collision_direction(position: Vec3) -> Option<Collision> {
-    if position.x + BALL_SIZE / 2. > WIN_WIDTH / 2. {
-        Some(Collision::Left)
-    } else if position.x - BALL_SIZE / 2. < -WIN_WIDTH / 2. {
-        Some(Collision::Right)
-    } else if position.y + BALL_SIZE / 2. > WIN_HEIGHT / 2. {
-        Some(Collision::Bottom)
-    } else {
-        None
-    }
-}
-
 fn play_sounds(
     mut collision_events: EventReader<BallCollisionEvent>,
     mut brick_destruction_events: EventReader<BrickDesctructionEvent>,

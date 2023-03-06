@@ -12,7 +12,7 @@ impl Plugin for GameInputPlugin {
                     .with_system(paddle_motion)
                     .with_system(launch_ball),
             )
-            .add_system(focus);
+            .add_system(window_focus);
     }
 }
 
@@ -39,7 +39,7 @@ fn click_to_start(btn: Res<Input<MouseButton>>, mut state: ResMut<State<GameStat
     }
 }
 
-fn focus(
+fn window_focus(
     mut windows: ResMut<Windows>,
     btn: Res<Input<MouseButton>>,
     key: Res<Input<KeyCode>>,

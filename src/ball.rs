@@ -39,6 +39,7 @@ impl Plugin for BallPlugin {
     fn build(&self, app: &mut App) {
         app.add_system_set(
             SystemSet::on_update(GameState::Playing)
+                .with_system(check_wall_collisions.before(ball_movement))
                 .with_system(check_collisions.before(ball_movement))
                 .with_system(ball_movement)
                 .with_system(ball_loss),
@@ -92,6 +93,24 @@ fn ball_loss(
     }
 }
 
+fn check_wall_collisions(
+    mut ball_query: Query<(&mut Ball, &mut Transform), Without<AttachedToPaddle>>,
+    mut collision_events: EventWriter<BallCollisionEvent>,
+) {
+    for (mut ball, ball_transform) in ball_query.iter_mut() {
+        if ball_transform.translation.x + BALL_SIZE / 2. > WIN_WIDTH / 2. {
+            ball.direction.x = -ball.direction.x.abs();
+            collision_events.send(BallCollisionEvent(BallCollisionType::Wall));
+        } else if ball_transform.translation.x - BALL_SIZE / 2. < -WIN_WIDTH / 2. {
+            ball.direction.x = ball.direction.x.abs();
+            collision_events.send(BallCollisionEvent(BallCollisionType::Wall));
+        } else if ball_transform.translation.y + BALL_SIZE / 2. > WIN_HEIGHT / 2. {
+            ball.direction.y = -ball.direction.y.abs();
+            collision_events.send(BallCollisionEvent(BallCollisionType::Wall));
+        }
+    }
+}
+
 fn check_collisions(
     mut commands: Commands,
     mut brick_events: EventWriter<BrickDesctructionEvent>,
@@ -111,66 +130,50 @@ fn check_collisions(
     let mut bricks_to_despawn = Vec::new();
 
     for (mut ball, ball_collider, ball_transform) in ball_query.iter_mut() {
-        let mut collision = get_wall_collision_direction(ball_transform.translation);
+        for (entity, other_collider, other_transform, brick, paddle) in collider_query.iter_mut() {
+            let collision = collide(
+                ball_transform.translation,
+                ball_collider.size,
+                other_transform.translation,
+                other_collider.size,
+            );
 
-        if collision.is_some() {
-            collision_events.send(BallCollisionEvent(BallCollisionType::Wall));
-
-            match collision {
-                Some(Collision::Left) => ball.direction.x = -ball.direction.x.abs(),
-                Some(Collision::Right) => ball.direction.x = ball.direction.x.abs(),
-                Some(Collision::Top) => ball.direction.y = ball.direction.y.abs(),
-                Some(Collision::Bottom) => ball.direction.y = -ball.direction.y.abs(),
-                _ => {}
-            }
-        } else {
-            for (entity, other_collider, other_transform, brick, paddle) in
-                collider_query.iter_mut()
-            {
-                collision = collide(
-                    ball_transform.translation,
-                    ball_collider.size,
-                    other_transform.translation,
-                    other_collider.size,
-                );
-
-                if collision.is_some() {
-                    if let Some(brick) = brick {
-                        if !bricks_to_despawn.contains(&entity) {
-                            bricks_to_despawn.push(entity);
-                        }
-
-                        brick_events.send(BrickDesctructionEvent {
-                            position: other_transform.translation,
-                            brick_type: brick.brick_type.clone(),
-                        });
-                    } else if let Some(paddle) = paddle {
-                        // Reflection based on paddle hit point
-                        let delta = ball_transform.translation.x - other_transform.translation.x;
-                        ball.direction.x += delta * 0.008;
-
-                        // Curve balls
-                        if paddle.speed.abs() > 12. {
-                            ball.curve = paddle.speed.clamp(-50., 50.) / 50.;
-                        }
-
-                        // Bounce up
-                        ball.direction.y = ball.direction.y.abs();
-                        collision_events.send(BallCollisionEvent(BallCollisionType::Paddle));
+            if collision.is_some() {
+                if let Some(brick) = brick {
+                    if !bricks_to_despawn.contains(&entity) {
+                        bricks_to_despawn.push(entity);
                     }
 
-                    if ball.ball_type != BallType::FireBall {
-                        match collision {
-                            Some(Collision::Left) => ball.direction.x = -ball.direction.x.abs(),
-                            Some(Collision::Right) => ball.direction.x = ball.direction.x.abs(),
-                            Some(Collision::Top) => ball.direction.y = ball.direction.y.abs(),
-                            Some(Collision::Bottom) => ball.direction.y = -ball.direction.y.abs(),
-                            _ => {}
-                        }
+                    brick_events.send(BrickDesctructionEvent {
+                        position: other_transform.translation,
+                        brick_type: brick.brick_type.clone(),
+                    });
+                } else if let Some(paddle) = paddle {
+                    // Reflection based on paddle hit point
+                    let delta = ball_transform.translation.x - other_transform.translation.x;
+                    ball.direction.x += delta * 0.008;
+
+                    // Curve balls
+                    if paddle.speed.abs() > 12. {
+                        ball.curve = paddle.speed.clamp(-50., 50.) / 50.;
                     }
 
-                    break;
+                    // Bounce up
+                    ball.direction.y = ball.direction.y.abs();
+                    collision_events.send(BallCollisionEvent(BallCollisionType::Paddle));
                 }
+
+                if ball.ball_type != BallType::FireBall {
+                    match collision {
+                        Some(Collision::Left) => ball.direction.x = -ball.direction.x.abs(),
+                        Some(Collision::Right) => ball.direction.x = ball.direction.x.abs(),
+                        Some(Collision::Top) => ball.direction.y = ball.direction.y.abs(),
+                        Some(Collision::Bottom) => ball.direction.y = -ball.direction.y.abs(),
+                        _ => {}
+                    }
+                }
+
+                break;
             }
         }
     }
