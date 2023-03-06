@@ -116,7 +116,11 @@ fn main() {
             ..default()
         },
         ..default()
-    }));
+    }))
+    .add_plugin(UiPlugin)
+    .add_plugin(BallPlugin)
+    .add_plugin(GameInputPlugin)
+    .add_plugin(GameAssetsPlugin);
 
     // Events
     app.add_event::<GamePauseEvent>()
@@ -124,8 +128,7 @@ fn main() {
         .add_event::<ScoreIncrementEvent>();
 
     // State independent systems
-    app.add_startup_system(spawn_background)
-        .add_startup_system(spawn_camera)
+    app.add_startup_system(spawn_camera)
         .add_system(on_window_focus)
         .add_system(on_pause)
         .add_system_to_stage(CoreStage::Last, play_sounds);
@@ -143,77 +146,45 @@ fn main() {
         .insert_resource(BackgroundAnimationDirection(true))
         .insert_resource(ClearColor(BG_COLOR));
 
-    // Plugins
-    app.add_plugin(UiPlugin)
-        .add_plugin(BallPlugin)
-        .add_plugin(GameInputPlugin)
-        .add_plugin(GameAssetsPlugin);
-
     app.add_state(GameState::Start);
 
     // Start state
-    app.add_system_set(
-        SystemSet::on_enter(GameState::Start)
-            .with_system(play_music)
-            .with_system(spawn_play_text)
-            .with_system(spawn_title_text),
-    )
-    .add_system_set(SystemSet::on_exit(GameState::Start).with_system(despawn::<Text>));
+    app.add_system_set(SystemSet::on_enter(GameState::Start).with_system(play_music))
+        .add_system_set(SystemSet::on_exit(GameState::Start).with_system(despawn::<Text>));
 
     // Playing state
     app.add_system_set(
         SystemSet::on_enter(GameState::Playing)
             .with_system(reset_bonus_score)
-            .with_system(spawn_ball_count)
             .with_system(spawn_bricks)
             .with_system(spawn_paddle)
-            .with_system(spawn_level_text.before(spawn_score_text))
-            .with_system(spawn_score_text)
             .with_system(spawn_ball),
     )
     .add_system_set(
         SystemSet::on_update(GameState::Playing)
             .with_system(increase_ball_speed)
             .with_system(on_all_balls_lost)
-            .with_system(animate_background)
             .with_system(next_level)
             .with_system(expire_fireballs)
             .with_system(handle_brick_destruction)
-            .with_system(update_score)
-            .with_system(update_ball_count)
-            .with_system(update_level_text)
-            .with_system(update_score_text),
+            .with_system(update_score),
     )
     .add_system_set(
         SystemSet::on_exit(GameState::Playing)
             .with_system(despawn::<Ball>)
             .with_system(despawn::<UiBall>)
             .with_system(despawn::<Paddle>)
-            .with_system(despawn::<Text>)
             .with_system(despawn::<Brick>),
     );
 
-    // Paused state
-    app.add_system_set(SystemSet::on_enter(GameState::Paused).with_system(spawn_play_text))
-        .add_system_set(SystemSet::on_exit(GameState::Paused).with_system(despawn::<PlayText>));
-
     // Level transition state
     app.add_system_set(
-        SystemSet::on_enter(GameState::LevelCompleted)
-            .with_system(spawn_level_complete_text)
-            .with_system(spawn_bonus_score_text),
-    )
-    .add_system_set(SystemSet::on_update(GameState::LevelCompleted).with_system(transition_timer))
-    .add_system_set(SystemSet::on_exit(GameState::LevelCompleted).with_system(despawn::<Text>));
+        SystemSet::on_update(GameState::LevelCompleted).with_system(transition_timer),
+    );
 
     // GameOver state
-    app.add_system_set(SystemSet::on_enter(GameState::GameOver).with_system(spawn_game_over_text))
-        .add_system_set(SystemSet::on_update(GameState::GameOver).with_system(transition_timer))
-        .add_system_set(
-            SystemSet::on_exit(GameState::GameOver)
-                .with_system(despawn::<Text>)
-                .with_system(reset_player_progress),
-        );
+    app.add_system_set(SystemSet::on_update(GameState::GameOver).with_system(transition_timer))
+        .add_system_set(SystemSet::on_exit(GameState::GameOver).with_system(reset_player_progress));
 
     app.run();
 }

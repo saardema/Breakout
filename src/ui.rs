@@ -32,6 +32,53 @@ pub struct BackgroundAnimationDirection(pub bool);
 #[derive(Resource)]
 pub struct ScoreAnimationTimer(Timer);
 
+impl Plugin for UiPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_startup_system(spawn_background)
+            .insert_resource(ScoreAnimationTimer(Timer::new(
+                Duration::from_secs_f32(SCORE_ANIM_MAX_DURATION),
+                TimerMode::Once,
+            )))
+            .add_system_set(
+                SystemSet::on_enter(GameState::Start)
+                    .with_system(spawn_play_text)
+                    .with_system(spawn_title_text),
+            );
+
+        // Playing state
+        app.add_system_set(
+            SystemSet::on_enter(GameState::Playing)
+                .with_system(spawn_ball_count)
+                .with_system(spawn_level_text.before(spawn_score_text))
+                .with_system(spawn_score_text),
+        )
+        .add_system_set(
+            SystemSet::on_update(GameState::Playing)
+                .with_system(animate_background)
+                .with_system(update_ball_count)
+                .with_system(update_level_text)
+                .with_system(update_score_text),
+        )
+        .add_system_set(SystemSet::on_exit(GameState::Playing).with_system(despawn::<Text>));
+
+        // Paused state
+        app.add_system_set(SystemSet::on_enter(GameState::Paused).with_system(spawn_play_text))
+            .add_system_set(SystemSet::on_exit(GameState::Paused).with_system(despawn::<PlayText>));
+
+        app.add_system_set(
+            SystemSet::on_enter(GameState::LevelCompleted)
+                .with_system(spawn_level_complete_text)
+                .with_system(spawn_bonus_score_text),
+        )
+        .add_system_set(SystemSet::on_exit(GameState::LevelCompleted).with_system(despawn::<Text>));
+
+        app.add_system_set(
+            SystemSet::on_enter(GameState::GameOver).with_system(spawn_game_over_text),
+        )
+        .add_system_set(SystemSet::on_exit(GameState::GameOver).with_system(despawn::<Text>));
+    }
+}
+
 pub fn spawn_background(mut commands: Commands, assets: Res<GameAssets>) {
     commands.spawn((
         SpriteBundle {
@@ -50,15 +97,6 @@ pub fn spawn_background(mut commands: Commands, assets: Res<GameAssets>) {
         },
         Background,
     ));
-}
-
-impl Plugin for UiPlugin {
-    fn build(&self, app: &mut App) {
-        app.insert_resource(ScoreAnimationTimer(Timer::new(
-            Duration::from_secs_f32(SCORE_ANIM_MAX_DURATION),
-            TimerMode::Once,
-        )));
-    }
 }
 
 pub fn animate_background(
