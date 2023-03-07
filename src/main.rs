@@ -8,6 +8,7 @@ use bevy::{
     window::{WindowFocused, WindowResolution},
 };
 use input::*;
+use rand::Rng;
 use ui::*;
 
 const WIN_WIDTH: f32 = 800.;
@@ -25,7 +26,7 @@ const EXTRA_BALL_COUNT: u8 = 3;
 const BALLS_SPEED_TIME_INCREMENT: f32 = 2.;
 const BRICK_COLUMNS: usize = 10;
 const BRICK_ROWS: usize = 6;
-const FIREBALL_CHANCE: f32 = 0.04;
+const MAX_FIREBALLS: u8 = 4;
 const MAX_FIREBALL_AGE: f32 = 4.;
 
 mod assets;
@@ -134,12 +135,16 @@ fn main() {
         .add_startup_system(configure_window)
         .add_system(on_window_focus)
         // .add_system(on_pause)
-        .add_startup_system(play_music)
+        // .add_startup_system(play_music)
         .add_system(play_sounds);
 
     // Playing state
     app.add_systems(
-        (reset_bonus_score, spawn_bricks, spawn_paddle, spawn_ball)
+        (reset_bonus_score, spawn_paddle, spawn_ball).in_schedule(OnEnter(GameState::Playing)),
+    )
+    .add_systems(
+        (spawn_bricks, apply_system_buffers, inject_fireballs)
+            .chain()
             .in_schedule(OnEnter(GameState::Playing)),
     )
     .add_systems(
@@ -213,6 +218,38 @@ fn reset_player_progress(mut player_progress: ResMut<PlayerProgress>) {
     *player_progress = PlayerProgress::default();
 }
 
+fn inject_fireballs(
+    mut commands: Commands,
+    mut query: Query<(Entity, &mut Brick)>,
+    assets: Res<GameAssets>,
+) {
+    let fireball_bundle = SpriteBundle {
+        texture: assets.image.ball_fire.clone(),
+        transform: Transform::from_xyz(0., 0., 10.),
+        ..default()
+    };
+
+    let mut rng = rand::thread_rng();
+    let mut indices: Vec<usize> = vec![];
+
+    for _ in 0..MAX_FIREBALLS {
+        indices.push(rng.gen_range(0..BRICK_COLUMNS * BRICK_ROWS));
+    }
+
+    let mut i = 0;
+
+    for (brick_entity, mut brick) in query.iter_mut() {
+        if indices.contains(&i) {
+            let child_entity = commands.spawn(fireball_bundle.clone()).id();
+            commands.entity(brick_entity).add_child(child_entity);
+
+            brick.brick_type = BrickType::Fireball;
+        }
+
+        i += 1;
+    }
+}
+
 fn spawn_bricks(mut commands: Commands, assets: Res<GameAssets>) {
     for x in 0..BRICK_COLUMNS {
         for y in 0..BRICK_ROWS {
@@ -225,7 +262,7 @@ fn spawn_bricks(mut commands: Commands, assets: Res<GameAssets>) {
                 &assets.image.brick_blue,
             ];
 
-            let mut bundle = (
+            commands.spawn((
                 Brick {
                     brick_type: BrickType::Regular,
                 },
@@ -241,23 +278,7 @@ fn spawn_bricks(mut commands: Commands, assets: Res<GameAssets>) {
                 Collider {
                     size: Vec2::new(BRICK_WIDTH, BRICK_HEIGHT),
                 },
-            );
-
-            if rand::random::<f32>() < FIREBALL_CHANCE {
-                bundle.0.brick_type = BrickType::Fireball;
-                let parent = commands.spawn(bundle).id();
-                let child = commands
-                    .spawn(SpriteBundle {
-                        texture: assets.image.ball_fire.clone(),
-                        transform: Transform::from_xyz(0., 0., 10.),
-                        ..default()
-                    })
-                    .id();
-
-                commands.entity(parent).push_children(&[child]);
-            } else {
-                commands.spawn(bundle);
-            }
+            ));
         }
     }
 }
