@@ -1,3 +1,5 @@
+use bevy::sprite::Anchor;
+
 use crate::*;
 
 const UI_Z_VALUE: f32 = 100.;
@@ -238,6 +240,7 @@ pub fn spawn_level_text(mut commands: Commands, asset_server: Res<AssetServer>) 
                     color: Color::GOLD,
                 }),
             ]),
+            text_anchor: Anchor::TopRight,
             transform: Transform::from_xyz(-5. * BRICK_WIDTH, WIN_HEIGHT / 2. - 10., UI_Z_VALUE),
             ..default()
         },
@@ -255,8 +258,8 @@ pub fn spawn_score_text(mut commands: Commands, asset_server: Res<AssetServer>) 
                     font_size: 60.0,
                     color: Color::WHITE,
                 },
-            )])
-            .with_alignment(TextAlignment::Left),
+            )]),
+            text_anchor: Anchor::TopRight,
             transform: Transform::from_xyz(-90., WIN_HEIGHT / 2. - 10., UI_Z_VALUE),
             ..default()
         },
@@ -269,8 +272,8 @@ pub fn spawn_score_text(mut commands: Commands, asset_server: Res<AssetServer>) 
                 font: asset_server.load("fonts/FiraMono-Medium.ttf"),
                 font_size: 60.0,
                 color: Color::GOLD,
-            })])
-            .with_alignment(TextAlignment::Left),
+            })]),
+            text_anchor: Anchor::TopRight,
             transform: Transform::from_xyz(65., WIN_HEIGHT / 2. - 10., UI_Z_VALUE),
             ..default()
         },
