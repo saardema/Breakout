@@ -130,8 +130,8 @@ fn main() {
         .add_event::<ScoreIncrementEvent>();
 
     // State independent systems
-    app.add_startup_system(spawn_window)
-        .add_startup_system(spawn_camera)
+    app.add_startup_system(spawn_camera)
+        .add_startup_system(configure_window)
         .add_system(on_window_focus)
         // .add_system(on_pause)
         .add_startup_system(play_music)
@@ -168,13 +168,12 @@ fn main() {
     app.run();
 }
 
-fn spawn_window(mut commands: Commands) {
-    commands.spawn(Window {
-        title: "Breakout!".to_string(),
-        resolution: WindowResolution::new(WIN_WIDTH, WIN_HEIGHT),
-        resizable: false,
-        ..default()
-    });
+fn configure_window(mut query: Query<&mut Window>) {
+    if let Ok(mut window) = query.get_single_mut() {
+        window.resolution = WindowResolution::new(WIN_WIDTH, WIN_HEIGHT);
+        window.title = "Breakout!".to_string();
+        window.resizable = false;
+    }
 }
 
 fn play_music(assets: Res<GameAssets>, audio: Res<Audio>) {
