@@ -40,14 +40,16 @@ pub struct BallPlugin;
 
 impl Plugin for BallPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system_set(
-            SystemSet::on_update(GameState::Playing)
-                .with_system(check_wall_collisions.before(ball_movement))
-                .with_system(check_collisions.before(ball_movement))
-                .with_system(ball_movement)
-                .with_system(increase_ball_speed)
-                .with_system(expire_fireballs)
-                .with_system(ball_loss),
+        app.add_systems(
+            (
+                check_wall_collisions.before(ball_movement),
+                check_collisions.before(ball_movement),
+                ball_movement,
+                increase_ball_speed,
+                expire_fireballs,
+                ball_loss,
+            )
+                .in_set(OnUpdate(GameState::Playing)),
         )
         .add_event::<BallCollisionEvent>()
         .add_event::<AllBallsLostEvent>();

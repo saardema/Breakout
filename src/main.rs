@@ -2,7 +2,11 @@ use std::time::Duration;
 
 use assets::*;
 use ball::*;
-use bevy::{prelude::*, sprite::collide_aabb::*, window::WindowFocused};
+use bevy::{
+    prelude::*,
+    sprite::collide_aabb::*,
+    window::{WindowFocused, WindowResolution},
+};
 use input::*;
 use ui::*;
 
@@ -76,8 +80,9 @@ impl Default for PlayerProgress {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(States, Hash, Clone, PartialEq, Eq, Debug, Default)]
 enum GameState {
+    #[default]
     Start,
     Playing,
     LevelCompleted,
@@ -98,37 +103,7 @@ pub struct StateTransitionTimer(pub Timer);
 fn main() {
     let mut app = App::new();
 
-    // Plugins
-    app.add_plugins(DefaultPlugins.set(WindowPlugin {
-        window: WindowDescriptor {
-            title: "Breakout!".to_string(),
-            width: WIN_WIDTH,
-            height: WIN_HEIGHT,
-            resizable: false,
-            monitor: if cfg!(debug_assertions) {
-                MonitorSelection::Index(0)
-            } else {
-                MonitorSelection::Current
-            },
-            ..default()
-        },
-        ..default()
-    }))
-    .add_plugin(UiPlugin)
-    .add_plugin(BallPlugin)
-    .add_plugin(GameInputPlugin)
-    .add_plugin(GameAssetsPlugin);
-
-    // Events
-    app.add_event::<GamePauseEvent>()
-        .add_event::<BrickDesctructionEvent>()
-        .add_event::<ScoreIncrementEvent>();
-
-    // State independent systems
-    app.add_startup_system(spawn_camera)
-        .add_system(on_window_focus)
-        .add_system(on_pause)
-        .add_system_to_stage(CoreStage::Last, play_sounds);
+    app.add_state::<GameState>();
 
     // Resources
     app.insert_resource(PlayerProgress::default())
@@ -142,44 +117,64 @@ fn main() {
         )))
         .insert_resource(ClearColor(BG_COLOR));
 
-    app.add_state(GameState::Start);
+    // Plugins
+    app.add_plugin(GameAssetsPlugin)
+        .add_plugins(DefaultPlugins)
+        .add_plugin(UiPlugin)
+        .add_plugin(BallPlugin)
+        .add_plugin(GameInputPlugin);
 
-    // Start state
-    app.add_system_set(SystemSet::on_enter(GameState::Start).with_system(play_music));
+    // Events
+    app.add_event::<GamePauseEvent>()
+        .add_event::<BrickDesctructionEvent>()
+        .add_event::<ScoreIncrementEvent>();
+
+    // State independent systems
+    app.add_startup_system(spawn_window)
+        .add_startup_system(spawn_camera)
+        .add_system(on_window_focus)
+        // .add_system(on_pause)
+        .add_startup_system(play_music)
+        .add_system(play_sounds);
 
     // Playing state
-    app.add_system_set(
-        SystemSet::on_enter(GameState::Playing)
-            .with_system(reset_bonus_score)
-            .with_system(spawn_bricks)
-            .with_system(spawn_paddle)
-            .with_system(spawn_ball),
+    app.add_systems(
+        (reset_bonus_score, spawn_bricks, spawn_paddle, spawn_ball)
+            .in_schedule(OnEnter(GameState::Playing)),
     )
-    .add_system_set(
-        SystemSet::on_update(GameState::Playing)
-            .with_system(on_all_balls_lost)
-            .with_system(next_level)
-            .with_system(handle_powerups)
-            .with_system(update_score),
+    .add_systems(
+        (on_all_balls_lost, next_level, handle_powerups, update_score)
+            .in_set(OnUpdate(GameState::Playing)),
     )
-    .add_system_set(
-        SystemSet::on_exit(GameState::Playing)
-            .with_system(despawn::<Ball>)
-            .with_system(despawn::<UiBall>)
-            .with_system(despawn::<Paddle>)
-            .with_system(despawn::<Brick>),
+    .add_systems(
+        (
+            despawn::<Ball>,
+            despawn::<UiBall>,
+            despawn::<Paddle>,
+            despawn::<Brick>,
+        )
+            .in_schedule(OnExit(GameState::Playing)),
     );
 
     // Level transition state
-    app.add_system_set(
-        SystemSet::on_update(GameState::LevelCompleted).with_system(transition_timer),
-    );
+    app.add_system(transition_timer.in_set(OnUpdate(GameState::LevelCompleted)));
 
     // GameOver state
-    app.add_system_set(SystemSet::on_update(GameState::GameOver).with_system(transition_timer))
-        .add_system_set(SystemSet::on_exit(GameState::GameOver).with_system(reset_player_progress));
+    app.add_systems((
+        transition_timer.in_set(OnUpdate(GameState::GameOver)),
+        reset_player_progress.in_schedule(OnExit(GameState::GameOver)),
+    ));
 
     app.run();
+}
+
+fn spawn_window(mut commands: Commands) {
+    commands.spawn(Window {
+        title: "Breakout!".to_string(),
+        resolution: WindowResolution::new(WIN_WIDTH, WIN_HEIGHT),
+        resizable: false,
+        ..default()
+    });
 }
 
 fn play_music(assets: Res<GameAssets>, audio: Res<Audio>) {
@@ -199,17 +194,18 @@ fn reset_bonus_score(mut progress: ResMut<PlayerProgress>) {
 
 fn transition_timer(
     mut timer: ResMut<StateTransitionTimer>,
-    mut state: ResMut<State<GameState>>,
+    state: ResMut<State<GameState>>,
+    mut next_state: ResMut<NextState<GameState>>,
     time: Res<Time>,
 ) {
     timer.0.tick(time.delta());
 
     if timer.0.just_finished() {
         timer.0.reset();
-        if state.current() == &GameState::GameOver {
-            state.set(GameState::Start).unwrap()
-        } else if state.current() == &GameState::LevelCompleted {
-            state.set(GameState::Playing).unwrap()
+        if state.0 == GameState::GameOver {
+            *next_state = NextState(Some(GameState::Start));
+        } else if state.0 == GameState::LevelCompleted {
+            *next_state = NextState(Some(GameState::Playing));
         }
     }
 }
@@ -345,14 +341,14 @@ fn on_all_balls_lost(
     mut commands: Commands,
     mut ball_loss_events: EventReader<AllBallsLostEvent>,
     mut player_progress: ResMut<PlayerProgress>,
-    mut state: ResMut<State<GameState>>,
+    mut next_state: ResMut<NextState<GameState>>,
 ) {
     for _ in ball_loss_events.iter() {
         if player_progress.extra_balls_remaining > 0 {
             player_progress.extra_balls_remaining -= 1;
             commands.add(SpawnBallCommand);
         } else {
-            state.set(GameState::GameOver).unwrap();
+            *next_state = NextState(Some(GameState::GameOver));
         }
     }
 }
@@ -365,13 +361,13 @@ fn despawn<T: Component>(mut commands: Commands, entities: Query<Entity, With<T>
 
 fn next_level(
     query: Query<&Brick>,
-    mut state: ResMut<State<GameState>>,
     mut progress: ResMut<PlayerProgress>,
+    mut next_state: ResMut<NextState<GameState>>,
 ) {
     if query.is_empty() {
         progress.level += 1;
         progress.extra_balls_remaining = EXTRA_BALL_COUNT;
-        state.set(GameState::LevelCompleted).unwrap();
+        *next_state = NextState(Some(GameState::LevelCompleted));
     }
 }
 
@@ -386,13 +382,17 @@ fn on_window_focus(
     }
 }
 
-fn on_pause(mut pause_event: EventReader<GamePauseEvent>, mut state: ResMut<State<GameState>>) {
-    if state.current() != &GameState::GameOver {
+fn on_pause(
+    mut pause_event: EventReader<GamePauseEvent>,
+    state: ResMut<State<GameState>>,
+    mut next_state: ResMut<NextState<GameState>>,
+) {
+    if state.0 != GameState::GameOver {
         for e in pause_event.iter() {
-            if e.should_pause && state.current() != &GameState::Paused {
-                state.overwrite_push(GameState::Paused).unwrap();
-            } else if !e.should_pause && state.current() == &GameState::Paused {
-                state.overwrite_pop().unwrap();
+            if e.should_pause && state.0 != GameState::Paused {
+                *next_state = NextState(Some(GameState::Paused));
+            } else if !e.should_pause && state.0 == GameState::Paused {
+                *next_state = NextState(Some(GameState::Playing));
             }
         }
     }

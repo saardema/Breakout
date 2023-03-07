@@ -44,46 +44,43 @@ impl Plugin for UiPlugin {
         app.insert_resource(BackgroundAnimationDirection(true));
 
         // Start state
-        app.add_system_set(
-            SystemSet::on_enter(GameState::Start)
-                .with_system(spawn_play_text)
-                .with_system(spawn_title_text),
-        )
-        .add_system_set(SystemSet::on_exit(GameState::Start).with_system(despawn::<Text>));
+        app.add_systems((spawn_play_text, spawn_title_text).in_schedule(OnEnter(GameState::Start)))
+            .add_system(despawn::<Text>.in_schedule(OnExit(GameState::Start)));
 
         // Playing state
-        app.add_system_set(
-            SystemSet::on_enter(GameState::Playing)
-                .with_system(spawn_ball_count)
-                .with_system(spawn_level_text.before(spawn_score_text))
-                .with_system(spawn_score_text),
+        app.add_systems(
+            (
+                spawn_ball_count,
+                spawn_level_text.before(spawn_score_text),
+                spawn_score_text,
+            )
+                .in_schedule(OnEnter(GameState::Playing)),
         )
-        .add_system_set(
-            SystemSet::on_update(GameState::Playing)
-                .with_system(animate_background)
-                .with_system(update_ball_count)
-                .with_system(update_level_text)
-                .with_system(update_score_text),
+        .add_systems(
+            (
+                animate_background,
+                update_ball_count,
+                update_level_text,
+                update_score_text,
+            )
+                .in_set(OnUpdate(GameState::Playing)),
         )
-        .add_system_set(SystemSet::on_exit(GameState::Playing).with_system(despawn::<Text>));
+        .add_system(despawn::<Text>.in_schedule(OnExit(GameState::Playing)));
 
         // Paused state
-        app.add_system_set(SystemSet::on_enter(GameState::Paused).with_system(spawn_play_text))
-            .add_system_set(SystemSet::on_exit(GameState::Paused).with_system(despawn::<PlayText>));
+        // app.add_system_set(SystemSet::on_enter(GameState::Paused).with_system(spawn_play_text))
+        //     .add_system_set(SystemSet::on_exit(GameState::Paused).with_system(despawn::<PlayText>));
 
         // Level completed state
-        app.add_system_set(
-            SystemSet::on_enter(GameState::LevelCompleted)
-                .with_system(spawn_level_complete_text)
-                .with_system(spawn_bonus_score_text),
+        app.add_systems(
+            (spawn_level_complete_text, spawn_bonus_score_text)
+                .in_schedule(OnEnter(GameState::LevelCompleted)),
         )
-        .add_system_set(SystemSet::on_exit(GameState::LevelCompleted).with_system(despawn::<Text>));
+        .add_system(despawn::<Text>.in_schedule(OnExit(GameState::LevelCompleted)));
 
         // Gameover state
-        app.add_system_set(
-            SystemSet::on_enter(GameState::GameOver).with_system(spawn_game_over_text),
-        )
-        .add_system_set(SystemSet::on_exit(GameState::GameOver).with_system(despawn::<Text>));
+        app.add_system(spawn_game_over_text.in_schedule(OnEnter(GameState::GameOver)))
+            .add_system(despawn::<Text>.in_schedule(OnExit(GameState::GameOver)));
     }
 }
 
@@ -137,7 +134,7 @@ pub fn spawn_title_text(mut commands: Commands, asset_server: Res<AssetServer>) 
                     color: Color::WHITE,
                 },
             )
-            .with_alignment(TextAlignment::CENTER),
+            .with_alignment(TextAlignment::Center),
             ..default()
         })
         .insert(Transform::from_xyz(0., 120., UI_Z_VALUE))
@@ -155,7 +152,7 @@ pub fn spawn_play_text(mut commands: Commands, asset_server: Res<AssetServer>) {
                     color: Color::WHITE,
                 },
             )
-            .with_alignment(TextAlignment::CENTER),
+            .with_alignment(TextAlignment::Center),
             ..default()
         })
         .insert(Transform::from_xyz(0., -200., 1.))
@@ -172,7 +169,7 @@ pub fn spawn_game_over_text(mut commands: Commands, asset_server: Res<AssetServe
                 color: Color::WHITE,
             },
         )
-        .with_alignment(TextAlignment::CENTER),
+        .with_alignment(TextAlignment::Center),
         transform: Transform::from_xyz(0., 0., UI_Z_VALUE),
         ..default()
     });
@@ -188,7 +185,7 @@ pub fn spawn_level_complete_text(mut commands: Commands, asset_server: Res<Asset
                 color: Color::WHITE,
             },
         )
-        .with_alignment(TextAlignment::CENTER),
+        .with_alignment(TextAlignment::Center),
         transform: Transform::from_xyz(0., 0., UI_Z_VALUE),
         ..default()
     });
@@ -217,7 +214,7 @@ pub fn spawn_bonus_score_text(
                 },
             ),
         ])
-        .with_alignment(TextAlignment::CENTER),
+        .with_alignment(TextAlignment::Center),
         transform: Transform::from_xyz(0., -80., UI_Z_VALUE),
         ..default()
     });
@@ -259,7 +256,7 @@ pub fn spawn_score_text(mut commands: Commands, asset_server: Res<AssetServer>) 
                     color: Color::WHITE,
                 },
             )])
-            .with_alignment(TextAlignment::TOP_LEFT),
+            .with_alignment(TextAlignment::Left),
             transform: Transform::from_xyz(-90., WIN_HEIGHT / 2. - 10., UI_Z_VALUE),
             ..default()
         },
@@ -273,7 +270,7 @@ pub fn spawn_score_text(mut commands: Commands, asset_server: Res<AssetServer>) 
                 font_size: 60.0,
                 color: Color::GOLD,
             })])
-            .with_alignment(TextAlignment::TOP_LEFT),
+            .with_alignment(TextAlignment::Left),
             transform: Transform::from_xyz(65., WIN_HEIGHT / 2. - 10., UI_Z_VALUE),
             ..default()
         },
@@ -353,7 +350,12 @@ pub fn update_ball_count(
     let mut i = 1;
 
     for mut visibility in query.iter_mut() {
-        visibility.is_visible = i <= player_progress.extra_balls_remaining;
+        *visibility = if i <= player_progress.extra_balls_remaining {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
+
         i += 1;
     }
 }
