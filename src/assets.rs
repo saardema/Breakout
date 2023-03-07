@@ -4,7 +4,7 @@ pub struct GameAssetsPlugin;
 
 impl Plugin for GameAssetsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system_to_stage(StartupStage::PreStartup, asset_loading);
+        app.add_startup_system(asset_loading.in_base_set(CoreSet::First));
     }
 }
 pub struct AudioHandles {

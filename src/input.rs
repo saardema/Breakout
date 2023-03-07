@@ -6,12 +6,8 @@ pub struct GameInputPlugin;
 
 impl Plugin for GameInputPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system_set(SystemSet::on_update(GameState::Start).with_system(click_to_start))
-            .add_system_set(
-                SystemSet::on_update(GameState::Playing)
-                    .with_system(paddle_motion)
-                    .with_system(launch_ball),
-            )
+        app.add_system(click_to_start.in_set(OnUpdate(GameState::Start)))
+            .add_systems((paddle_motion, launch_ball).in_set(OnUpdate(GameState::Playing)))
             .add_system(window_focus);
     }
 }
@@ -33,34 +29,34 @@ fn paddle_motion(
     }
 }
 
-fn click_to_start(btn: Res<Input<MouseButton>>, mut state: ResMut<State<GameState>>) {
+fn click_to_start(btn: Res<Input<MouseButton>>, mut next_state: ResMut<NextState<GameState>>) {
     if btn.just_pressed(MouseButton::Left) {
-        state.set(GameState::Playing).unwrap();
+        *next_state = NextState(Some(GameState::Playing));
     }
 }
 
 fn window_focus(
-    mut windows: ResMut<Windows>,
+    mut windows: Query<&mut Window>,
     btn: Res<Input<MouseButton>>,
     key: Res<Input<KeyCode>>,
     mut pause_event: EventWriter<GamePauseEvent>,
 ) {
-    let window = windows.get_primary_mut().unwrap();
+    for mut window in windows.iter_mut() {
+        if btn.just_pressed(MouseButton::Left) {
+            window.cursor.grab_mode = CursorGrabMode::Confined;
+            window.cursor.visible = false;
 
-    if btn.just_pressed(MouseButton::Left) {
-        window.set_cursor_grab_mode(CursorGrabMode::Confined);
-        window.set_cursor_visibility(false);
+            pause_event.send(GamePauseEvent {
+                should_pause: false,
+            })
+        }
 
-        pause_event.send(GamePauseEvent {
-            should_pause: false,
-        })
-    }
+        if key.just_pressed(KeyCode::Escape) {
+            window.cursor.grab_mode = CursorGrabMode::None;
+            window.cursor.visible = true;
 
-    if key.just_pressed(KeyCode::Escape) {
-        window.set_cursor_grab_mode(CursorGrabMode::None);
-        window.set_cursor_visibility(true);
-
-        pause_event.send(GamePauseEvent { should_pause: true })
+            pause_event.send(GamePauseEvent { should_pause: true })
+        }
     }
 }
 
