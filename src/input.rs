@@ -66,8 +66,11 @@ fn launch_ball(
     kb: Res<Input<KeyCode>>,
 ) {
     if kb.just_pressed(KeyCode::Space) {
-        if let Ok(entity) = query.get_single() {
+        for entity in &query {
             commands.entity(entity).remove::<AttachedToPaddle>();
         }
+        // if let Ok(entity) = query.get_single() {
+        //     commands.entity(entity).remove::<AttachedToPaddle>();
+        // }
     }
 }

@@ -148,7 +148,12 @@ fn main() {
             .in_schedule(OnEnter(GameState::Playing)),
     )
     .add_systems(
-        (on_all_balls_lost, next_level, handle_powerups, update_score)
+        (
+            on_all_balls_lost.after(ball_loss),
+            next_level,
+            trigger_powerup,
+            update_score,
+        )
             .in_set(OnUpdate(GameState::Playing)),
     )
     .add_systems(
@@ -175,7 +180,7 @@ fn main() {
 
 fn configure_window(mut query: Query<&mut Window>) {
     if let Ok(mut window) = query.get_single_mut() {
-        window.resolution = WindowResolution::new(WIN_WIDTH, WIN_HEIGHT);
+        window.resolution = (WIN_WIDTH, WIN_HEIGHT).into();
         window.title = "Breakout!".to_string();
         window.resizable = false;
     }
@@ -418,7 +423,7 @@ fn on_pause(
     }
 }
 
-fn handle_powerups(
+fn trigger_powerup(
     mut commands: Commands,
     mut events: EventReader<BrickDesctructionEvent>,
     assets: Res<GameAssets>,

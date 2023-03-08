@@ -84,13 +84,13 @@ fn ball_movement(
     }
 }
 
-fn ball_loss(
+pub fn ball_loss(
     mut commands: Commands,
     mut ball_loss_event: EventWriter<AllBallsLostEvent>,
     mut ball_query: Query<(Entity, &mut Transform), With<Ball>>,
 ) {
-    for (entity, ball_transform) in ball_query.iter_mut() {
-        if ball_transform.translation.y < -WIN_HEIGHT / 2. {
+    for (entity, transform) in ball_query.iter_mut() {
+        if transform.translation.y < -WIN_HEIGHT / 2. {
             commands.entity(entity).despawn();
         }
     }
@@ -200,6 +200,7 @@ impl Command for SpawnBallCommand {
     fn write(self, world: &mut World) {
         let assets = world.get_resource::<GameAssets>();
         let progress = world.get_resource::<PlayerProgress>();
+
         if let Some(assets) = assets {
             world.spawn((
                 Ball {
